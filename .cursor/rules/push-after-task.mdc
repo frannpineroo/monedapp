@@ -1,0 +1,14 @@
+---
+description: After each completed task, commit and push changes to origin
+alwaysApply: true
+---
+
+# Push after each task
+
+When a task in this repository is finished (feature, fix, refactor, or setup):
+
+1. **Commit** the relevant changes without waiting for an explicit "commit" request. This overrides the default "only commit when asked" rule for this project.
+2. Follow the normal commit protocol: status, diff, log style, stage relevant files, commit with a clear message via HEREDOC. Never commit secrets (`.env`, credentials, etc.).
+3. **Push** to `origin` on the current branch (`git push -u origin HEAD` if upstream is missing).
+4. Confirm with `git status` that the branch is clean and up to date with the remote.
+5. If push fails (auth, conflicts, protection), report the error and stop; do not force-push to `main`/`master`.
