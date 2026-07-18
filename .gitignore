@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+coverage/
+.expo/
+mobile/.expo/
+mobile/node_modules/
+backend/node_modules/
+backend/dist/
+
+# Secrets / local env (keep .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.p8
+*.key
+credentials.json
+**/secrets/
