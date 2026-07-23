@@ -1,6 +1,7 @@
 import { apiRequest } from '@/src/api/client'
 import type { Movement } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
+import { formatAmount } from '@/src/lib/format'
 import { colors } from '@/src/theme'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -64,7 +65,7 @@ export default function MovementsScreen() {
                 </View>
                 <Text style={[styles.amount, { color }]}>
                   {sign}
-                  {item.currency} {amount.toLocaleString('es-AR')}
+                  {formatAmount(amount, item.currency)}
                 </Text>
               </View>
             )

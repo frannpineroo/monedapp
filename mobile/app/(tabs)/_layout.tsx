@@ -23,7 +23,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Cuánto tengo',
+          title: 'Inicio',
           tabBarIcon: ({ color }) => <TabIcon name="credit-card" color={String(color)} />,
         }}
       />
