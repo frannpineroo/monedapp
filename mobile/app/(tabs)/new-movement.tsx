@@ -1,5 +1,5 @@
 import { apiRequest } from '@/src/api/client'
-import type { Movement, Wallet } from '@/src/api/types'
+import type { Client, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { colors } from '@/src/theme'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,14 +28,41 @@ export default function NewMovementScreen() {
     enabled: !!accessToken,
   })
 
+  const clients = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => apiRequest<Client[]>('/clients', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+
   const [type, setType] = useState<MovementType>('income')
   const [walletId, setWalletId] = useState<string | null>(null)
   const [toWalletId, setToWalletId] = useState<string | null>(null)
+  const [clientId, setClientId] = useState<string | null>(null)
+  const [showNewClient, setShowNewClient] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const selectedWalletId = walletId ?? wallets.data?.[0]?.id ?? null
+
+  const createClient = useMutation({
+    mutationFn: (name: string) =>
+      apiRequest<Client>('/clients', {
+        method: 'POST',
+        token: accessToken,
+        body: { name },
+      }),
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ['clients'] })
+      setClientId(created.id)
+      setNewClientName('')
+      setShowNewClient(false)
+    },
+    onError: (e) => {
+      setError(e instanceof Error ? e.message : 'No se pudo crear el cliente')
+    },
+  })
 
   const create = useMutation({
     mutationFn: () =>
@@ -45,6 +72,7 @@ export default function NewMovementScreen() {
         body: {
           walletId: selectedWalletId,
           toWalletId: type === 'transfer' ? toWalletId : undefined,
+          clientId: type === 'income' && clientId ? clientId : undefined,
           type,
           amount: Number(amount),
           description,
@@ -56,6 +84,7 @@ export default function NewMovementScreen() {
       await queryClient.invalidateQueries({ queryKey: ['balance-by-wallet'] })
       setAmount('')
       setDescription('')
+      setClientId(null)
       router.push('/(tabs)/movements')
     },
     onError: (e) => {
@@ -67,6 +96,15 @@ export default function NewMovementScreen() {
     () => (wallets.data ?? []).filter((w) => w.id !== selectedWalletId),
     [wallets.data, selectedWalletId]
   )
+
+  function selectType(next: MovementType) {
+    setType(next)
+    if (next !== 'income') {
+      setClientId(null)
+      setShowNewClient(false)
+      setNewClientName('')
+    }
+  }
 
   function submit() {
     setError(null)
@@ -89,6 +127,16 @@ export default function NewMovementScreen() {
     create.mutate()
   }
 
+  function submitNewClient() {
+    setError(null)
+    const name = newClientName.trim()
+    if (!name) {
+      setError('Escribí el nombre del cliente')
+      return
+    }
+    createClient.mutate(name)
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, gap: 14 }}>
       <Text style={styles.label}>Tipo</Text>
@@ -97,7 +145,7 @@ export default function NewMovementScreen() {
           <Pressable
             key={t}
             style={[styles.chip, type === t && styles.chipActive]}
-            onPress={() => setType(t)}
+            onPress={() => selectType(t)}
           >
             <Text style={[styles.chipText, type === t && styles.chipTextActive]}>
               {t === 'income' ? 'Ingreso' : t === 'expense' ? 'Gasto' : 'Transferencia'}
@@ -139,6 +187,63 @@ export default function NewMovementScreen() {
               </Pressable>
             ))}
           </View>
+        </>
+      ) : null}
+
+      {type === 'income' ? (
+        <>
+          <Text style={styles.label}>Cliente (opcional)</Text>
+          <View style={styles.rowWrap}>
+            <Pressable
+              style={[styles.chip, clientId === null && styles.chipActive]}
+              onPress={() => setClientId(null)}
+            >
+              <Text style={[styles.chipText, clientId === null && styles.chipTextActive]}>
+                Sin cliente
+              </Text>
+            </Pressable>
+            {(clients.data ?? []).map((c) => (
+              <Pressable
+                key={c.id}
+                style={[styles.chip, clientId === c.id && styles.chipActive]}
+                onPress={() => setClientId(c.id)}
+              >
+                <Text style={[styles.chipText, clientId === c.id && styles.chipTextActive]}>
+                  {c.name}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.chip, showNewClient && styles.chipActive]}
+              onPress={() => setShowNewClient((v) => !v)}
+            >
+              <Text style={[styles.chipText, showNewClient && styles.chipTextActive]}>
+                Nuevo cliente
+              </Text>
+            </Pressable>
+          </View>
+          {showNewClient ? (
+            <View style={styles.newClientRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Nombre del cliente"
+                placeholderTextColor={colors.muted}
+                value={newClientName}
+                onChangeText={setNewClientName}
+              />
+              <Pressable
+                style={styles.smallButton}
+                onPress={submitNewClient}
+                disabled={createClient.isPending}
+              >
+                {createClient.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Agregar</Text>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
         </>
       ) : null}
 
@@ -193,6 +298,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  newClientRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -229,6 +339,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
+  },
+  smallButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: 88,
+    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',

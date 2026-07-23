@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 
 const accessSecret = () => process.env.JWT_ACCESS_SECRET || 'dev-access-secret'
@@ -6,7 +7,7 @@ const accessExpires = () => process.env.JWT_ACCESS_EXPIRES_IN || '15m'
 const refreshExpires = () => process.env.JWT_REFRESH_EXPIRES_IN || '7d'
 
 export type AccessPayload = { sub: string; email: string; type: 'access' }
-export type RefreshPayload = { sub: string; type: 'refresh' }
+export type RefreshPayload = { sub: string; type: 'refresh'; jti: string }
 
 export function signAccessToken(userId: string, email: string): string {
   return jwt.sign({ sub: userId, email, type: 'access' } satisfies AccessPayload, accessSecret(), {
@@ -15,9 +16,13 @@ export function signAccessToken(userId: string, email: string): string {
 }
 
 export function signRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId, type: 'refresh' } satisfies RefreshPayload, refreshSecret(), {
-    expiresIn: refreshExpires() as jwt.SignOptions['expiresIn'],
-  })
+  return jwt.sign(
+    { sub: userId, type: 'refresh', jti: crypto.randomUUID() } satisfies RefreshPayload,
+    refreshSecret(),
+    {
+      expiresIn: refreshExpires() as jwt.SignOptions['expiresIn'],
+    }
+  )
 }
 
 export function verifyAccessToken(token: string): AccessPayload {

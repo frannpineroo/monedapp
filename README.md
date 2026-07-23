@@ -37,6 +37,15 @@ npm run dev
 # → http://localhost:8000/health
 ```
 
+### Tests de auth
+
+Con Postgres levantado (`docker compose up -d db`):
+
+```bash
+cd backend
+npm test
+```
+
 ### 4. App móvil
 
 ```bash

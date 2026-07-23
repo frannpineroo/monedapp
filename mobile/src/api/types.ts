@@ -32,6 +32,14 @@ export type WalletBalance = {
   currency: string
 }
 
+export type Client = {
+  id: string
+  name: string
+  defaultCurrency: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type Movement = {
   id: string
   walletId: string
