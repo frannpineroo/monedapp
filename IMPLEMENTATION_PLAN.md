@@ -51,25 +51,27 @@ Un usuario nuevo puede, en <5 minutos locales: registrarse, elegir “Soy freela
 
 # Roadmap post-core
 
-Cinco specs aprobados, ninguno implementado. El detalle de cada uno (archivos, endpoints, casos de test) vive en `~/.claude/plans/i-invite-the-council-rippling-seal.md`; acá queda el orden y el porqué.
+Seis specs aprobados, ninguno implementado. El detalle de cada uno (archivos, endpoints, casos de test) vive en `~/.claude/plans/`: la integración de Mercado Pago en `i-invite-the-council-cheeky-bengio.md`, los otros cinco en `i-invite-the-council-rippling-seal.md`. Acá queda el orden y el porqué.
 
 ## Orden de ejecución
 
 | # | Fase | Tamaño | Por qué va acá |
 |---|---|---|---|
-| 1 | Cotización real (dolarapi) | M | Es el único cuyo retraso deja **daño permanente**: cada movimiento se sella con `exchangeRateId`, así que todo lo que se cargue mientras el FX sea stub queda con una cotización inventada para siempre. |
-| 2 | ABM de billeteras y clientes | S | Independiente y chico. Aporta el tab **Ajustes** (donde después cuelgan categorías) y el campo `Client.phone` (que usa el recordatorio de cobranzas). Cierra dos bugs de borrado. |
-| 3 | Categorías de gasto y rubros de ingreso | M | Debe ir antes de cualquier reporte: si no, el reporte mensual se escribe dos veces. También define el rubro que usa la factura de la fase 4. |
-| 4 | Cuentas por cobrar | L | Necesita `phone` (fase 2) y el rubro de ingreso (fase 3). Introduce `LedgerEntry.changeArs` y arregla `assertBalanced`, que hoy suma monedas distintas como si fueran comparables. |
-| 5 | Reportes mensuales + monotributo | M/L | Va último a propósito: consume categorías (desglose), devengado (“facturé” = `invoice`, no cobranza) y `changeArs` (conversión a ARS ya resuelta). Con FX real de la fase 1, los números valen. |
+| 1 | Cotización real (dolarapi) | M | Es el único cuyo retraso deja **daño permanente**: cada movimiento se sella con `exchangeRateId`, así que todo lo que se cargue mientras el FX sea stub queda con una cotización inventada para siempre. Además Mercado Pago (fase 4) postea con `'blue'`: si el FX ya es real, hereda cotización real sin tocar nada. |
+| 2 | ABM de billeteras y clientes | S | Independiente y chico. Aporta el tab **Ajustes** (donde después cuelgan categorías e integraciones) y el campo `Client.phone` (que usa el recordatorio de cobranzas). Cierra dos bugs de borrado. |
+| 3 | Categorías de gasto y rubros de ingreso | M | Antes de cualquier reporte, si no el reporte mensual se escribe dos veces. También define el rubro que usan la factura (fase 5) y la comisión de Mercado Pago (fase 4, que si no cae en “Gastos operativos”). |
+| 4 | Integración Mercado Pago | XL | Es la promesa central del spec (“integraciones que ahorran carga manual”) y el mayor salto de valor. Va antes de cobrables porque su parte bloqueante es externa (falta una URL HTTPS pública para callback y webhook): conviene empezarla temprano y dejar la verificación real en espera mientras se avanza con lo demás. |
+| 5 | Cuentas por cobrar | L | Necesita `phone` (fase 2) y el rubro de ingreso (fase 3). Introduce `LedgerEntry.changeArs` y reescribe `assertBalanced`, que hoy suma monedas distintas como si fueran comparables — hacerlo con los tests de ledger de Mercado Pago ya en verde da red de seguridad. |
+| 6 | Reportes mensuales + monotributo | M/L | Último a propósito: consume categorías (desglose), devengado (“facturé” = `invoice`, no cobranza), `changeArs` (conversión a ARS resuelta) y los movimientos importados de MP. Con el FX real de la fase 1, los números valen. |
 
 ### Dependencias
 
 ```
-FX real ──────────────────────────────┐
-ABM ──► (tab Ajustes, Client.phone) ──┤
-                                      ├──► Cuentas por cobrar ──► Reportes + monotributo
-Categorías ──► (rubro de ingreso) ────┘                 (changeArs) ──┘
+FX real ──────────────────────────────────────────────┐
+ABM ──► (tab Ajustes, Client.phone) ──┐               │
+Categorías ──► (rubro, comisión MP) ──┴──► Mercado Pago┤
+                                                       ├──► Cobrables ──► Reportes + monotributo
+                                          (changeArs) ─┘
 ```
 
 ## Qué entrega cada fase
@@ -80,9 +82,23 @@ Categorías ──► (rubro de ingreso) ────┘                 (change
 
 **3. Categorías.** Una categoría **es** una `Account` (`EXPENSE`/`INCOME`); `Movement.categoryAccountId` con backfill desde el ledger; ABM de categorías; `GET /reports/by-category`. En la app, chips de categoría con alta inline y bloque “En qué se te fue”.
 
-**4. Cuentas por cobrar.** Tipos `invoice` y `collection`, cuenta “Deudores por ventas”, cobros parciales con vencimiento, diferencia de cambio automática cuando se cobra en otra moneda, `GET /receivables` con antigüedad y recordatorio por WhatsApp.
+**4. Mercado Pago.** OAuth `authorization_code` + PKCE con el backend como `redirect_uri` (MP exige HTTPS estático) y rebote al deep link `monedapp://`; tokens AES-256-GCM en `Integration.credentials`; webhooks firmados HMAC-SHA256 con verificación de manifiesto, deduplicados por `IntegrationWebhookEvent` y `Movement @@unique([userId, externalProvider, externalId])`; auto-posteo del pago aprobado (ingreso bruto + gasto de comisión) en una billetera “Mercado Pago” autoprovista, marcado `needsReview` para que el usuario le ponga cliente y descripción; `POST /integrations/:provider/sync` como backfill manual; reembolsos y contracargos como asiento compensatorio, nunca borrando el movimiento original.
 
-**5. Reportes + monotributo.** `GET /reports/monthly-summary` y `/reports/monotributo-alert` con ventana de 12 meses móviles, escalas de ARCA en tabla seedeada, `PATCH /users/me` para la categoría, y pestaña Reportes con barra de uso del techo.
+**5. Cuentas por cobrar.** Tipos `invoice` y `collection`, cuenta “Deudores por ventas”, cobros parciales con vencimiento, diferencia de cambio automática cuando se cobra en otra moneda, `GET /receivables` con antigüedad y recordatorio por WhatsApp.
+
+**6. Reportes + monotributo.** `GET /reports/monthly-summary` y `/reports/monotributo-alert` con ventana de 12 meses móviles, escalas de ARCA en tabla seedeada, `PATCH /users/me` para la categoría, y pestaña Reportes con barra de uso del techo.
+
+## Choques entre specs a resolver al implementar
+
+- **Barra de tabs.** Los specs suman por su cuenta “Revisar” (MP), “Ajustes” (ABM) y “Reportes” — con Inicio/Movimientos/Nuevo serían seis. Decisión propuesta: dejar cinco tabs (Inicio · Movimientos · Nuevo · Reportes · Ajustes) y resolver la bandeja de revisión como filtro `needsReview` dentro de Movimientos más un banner en Inicio; “Por cobrar” e “Integraciones” quedan como pantallas stack.
+- **`serializeMovement`** lo tocan tres fases: `needsReview`/`source` (MP), `category` (categorías) y `dueDate`/`invoiceId`/`outstanding` (cobrables). Cada una suma campos, ninguna reemplaza.
+- **Detalle de movimiento.** MP crea `mobile/app/movement/[id].tsx` para editar y confirmar; cobrables necesita un detalle de factura. Reusar la misma pantalla en vez de escribir dos.
+- **`assertBalanced`.** El spec de MP lo anota como riesgo pre-existente (aritmética float); el de cobrables lo reescribe sobre `changeArs`. Cerrarlo en la fase 5, no antes.
+- **Comisión de MP.** Hoy iría a `getDefaultExpenseAccountId`; con categorías ya implementadas debe apuntar a “Comisiones bancarias”.
+
+## Backlog sin spec
+
+Detectado en la revisión, todavía sin plan escrito: recuperar contraseña (bloqueante para lanzar), paginación y búsqueda de movimientos, adjuntar comprobante, export para el contador, movimientos recurrentes, apartados automáticos por regla, vencimientos impositivos, facturación electrónica ARCA, Stripe/Hotmart, y tests en la app (hoy solo hay tests de backend).
 
 ## Backlog sin spec
 
