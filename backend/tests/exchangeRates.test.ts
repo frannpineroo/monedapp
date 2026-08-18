@@ -1,6 +1,8 @@
 import 'dotenv/config'
+import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Currency } from '@prisma/client'
+import { createApp } from '../src/app'
 import {
   defaultTypeForCurrency,
   ensureRateForDate,
@@ -9,6 +11,8 @@ import {
   typesForCurrency,
 } from '../src/services/exchangeRateService'
 import { prisma } from '../src/prisma/prisma'
+
+const app = createApp()
 
 function jsonResponse(body: unknown) {
   return { ok: true, json: async () => body } as unknown as Response
@@ -156,5 +160,49 @@ describe('getRates', () => {
     expect(rates).toHaveLength(1)
     expect(Number(rates[0].value)).toBe(1)
     expect(rates[0].source).toBe('fixed')
+  })
+})
+
+async function registerUser() {
+  const email = `fx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.local`
+  const res = await request(app).post('/auth/register').send({ email, password: 'password123' })
+  return res.body.accessToken as string
+}
+
+describe('GET /exchange-rates', () => {
+  beforeEach(() => {
+    process.env.FX_ENABLED = 'true'
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ compra: 1500, venta: 1530 })))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('USD → 3 tipos con buy y sell', async () => {
+    const token = await registerUser()
+    const date = uniquePastDate().toISOString().slice(0, 10)
+
+    const res = await request(app)
+      .get(`/exchange-rates?currency=USD&date=${date}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(3)
+    expect(Number(res.body[0].buy)).toBe(1500)
+    expect(Number(res.body[0].sell)).toBe(1530)
+    expect(res.body[0].source).toBe('argentinadatos')
+  })
+
+  it('USDT → solo cripto', async () => {
+    const token = await registerUser()
+    const date = uniquePastDate().toISOString().slice(0, 10)
+
+    const res = await request(app)
+      .get(`/exchange-rates?currency=USDT&date=${date}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.map((r: { type: string }) => r.type)).toEqual(['cripto'])
   })
 })

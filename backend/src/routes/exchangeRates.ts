@@ -30,6 +30,8 @@ router.get(
         type: r.type,
         currency: r.currency,
         value: r.value,
+        buy: r.buy,
+        sell: r.sell,
         source: r.source,
       }))
     )
