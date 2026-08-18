@@ -1,6 +1,7 @@
 import { apiRequest } from '@/src/api/client'
-import type { Client, Movement, Wallet } from '@/src/api/types'
+import type { Client, ExchangeRate, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
+import { formatAmount } from '@/src/lib/format'
 import { colors } from '@/src/theme'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
@@ -46,6 +47,28 @@ export default function NewMovementScreen() {
 
   const selectedWalletId = walletId ?? wallets.data?.[0]?.id ?? null
 
+  const [rateType, setRateType] = useState<string | null>(null)
+
+  const selectedWallet = useMemo(
+    () => (wallets.data ?? []).find((w) => w.id === selectedWalletId) ?? null,
+    [wallets.data, selectedWalletId]
+  )
+  const currency = selectedWallet?.currency ?? 'ARS'
+  const today = new Date().toISOString().slice(0, 10)
+
+  const rates = useQuery({
+    queryKey: ['exchange-rates', currency, today],
+    queryFn: () =>
+      apiRequest<ExchangeRate[]>(`/exchange-rates?currency=${currency}&date=${today}`, {
+        token: accessToken,
+      }),
+    enabled: !!accessToken && currency !== 'ARS',
+  })
+
+  // Si cambia la billetera, el tipo elegido puede no existir para la nueva moneda.
+  const activeRate =
+    (rates.data ?? []).find((r) => r.type === rateType) ?? rates.data?.[0] ?? null
+
   const createClient = useMutation({
     mutationFn: (name: string) =>
       apiRequest<Client>('/clients', {
@@ -77,6 +100,7 @@ export default function NewMovementScreen() {
           amount: Number(amount),
           description,
           date: new Date().toISOString().slice(0, 10),
+          exchangeRateType: currency !== 'ARS' ? (activeRate?.type ?? undefined) : undefined,
         },
       }),
     onSuccess: async () => {
@@ -257,6 +281,37 @@ export default function NewMovementScreen() {
         onChangeText={setAmount}
       />
 
+      {currency !== 'ARS' && (rates.data ?? []).length > 0 ? (
+        <>
+          <Text style={styles.label}>Cotización</Text>
+          <View style={styles.rowWrap}>
+            {(rates.data ?? []).map((r) => (
+              <Pressable
+                key={r.id}
+                style={[styles.chip, activeRate?.id === r.id && styles.chipActive]}
+                onPress={() => setRateType(r.type)}
+              >
+                <Text
+                  style={[styles.chipText, activeRate?.id === r.id && styles.chipTextActive]}
+                >
+                  {r.type} {Number(r.sell ?? r.value).toLocaleString('es-AR', {
+                    maximumFractionDigits: 0,
+                  })}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {activeRate && Number(amount) > 0 ? (
+            <Text style={styles.hint}>
+              ≈ {formatAmount(Number(amount) * Number(activeRate.sell ?? activeRate.value), 'ARS')}
+              {activeRate.source === 'db-fallback' || activeRate.source === 'stub'
+                ? ' · cotización estimada'
+                : ''}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+
       <Text style={styles.label}>Descripción</Text>
       <TextInput
         style={styles.input}
@@ -355,5 +410,9 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.danger,
+  },
+  hint: {
+    color: colors.muted,
+    fontSize: 13,
   },
 })
