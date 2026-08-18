@@ -13,6 +13,16 @@ function dateOnly(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
 }
 
+export function defaultTypeForCurrency(currency: Currency): ExchangeRateType {
+  return currency === Currency.USDT ? ExchangeRateType.cripto : ExchangeRateType.blue
+}
+
+export function typesForCurrency(currency: Currency): ExchangeRateType[] {
+  if (currency === Currency.ARS) return []
+  if (currency === Currency.USDT) return [ExchangeRateType.cripto]
+  return [ExchangeRateType.oficial, ExchangeRateType.blue, ExchangeRateType.mep]
+}
+
 export async function ensureRateForDate(
   date: Date,
   currency: Currency,
