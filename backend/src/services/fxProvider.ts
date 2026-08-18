@@ -51,3 +51,22 @@ export async function fetchLiveRate(type: ExchangeRateType): Promise<FxQuote | n
   const quote = await getQuote(`${baseUrl}/${CASA_BY_TYPE[type]}`, timeoutMs)
   return quote ? { ...quote, source: 'dolarapi' } : null
 }
+
+export async function fetchHistoricalRate(
+  type: ExchangeRateType,
+  date: Date
+): Promise<FxQuote | null> {
+  const { historicalBaseUrl, timeoutMs, enabled } = fxConfig()
+  if (!enabled) return null
+
+  const yyyy = date.getUTCFullYear()
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(date.getUTCDate()).padStart(2, '0')
+
+  const quote = await getQuote(
+    `${historicalBaseUrl}/${CASA_BY_TYPE[type]}/${yyyy}/${mm}/${dd}`,
+    timeoutMs
+  )
+  return quote ? { ...quote, source: 'argentinadatos' } : null
+}
+

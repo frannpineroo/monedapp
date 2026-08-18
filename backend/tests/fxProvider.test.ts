@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CASA_BY_TYPE, fetchLiveRate } from '../src/services/fxProvider'
+import { CASA_BY_TYPE, fetchHistoricalRate, fetchLiveRate } from '../src/services/fxProvider'
 
 function jsonResponse(body: unknown) {
   return { ok: true, json: async () => body } as unknown as Response
@@ -54,5 +54,37 @@ describe('fxProvider.fetchLiveRate', () => {
 
     expect(await fetchLiveRate('blue')).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('fxProvider.fetchHistoricalRate', () => {
+  beforeEach(() => {
+    process.env.FX_ENABLED = 'true'
+    process.env.FX_HISTORICAL_BASE_URL = 'https://hist.test/v1/cotizaciones/dolares'
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    delete process.env.FX_HISTORICAL_BASE_URL
+  })
+
+  it('arma el path yyyy/MM/dd en UTC y devuelve source argentinadatos', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ compra: 1490, venta: 1530, fecha: '2026-07-18' })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const quote = await fetchHistoricalRate('blue', new Date(Date.UTC(2026, 6, 18)))
+
+    expect(quote).toEqual({ buy: 1490, sell: 1530, source: 'argentinadatos' })
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://hist.test/v1/cotizaciones/dolares/blue/2026/07/18'
+    )
+  })
+
+  it('404 → null', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) }) as unknown as Response))
+
+    expect(await fetchHistoricalRate('mep', new Date(Date.UTC(2026, 0, 5)))).toBeNull()
   })
 })
