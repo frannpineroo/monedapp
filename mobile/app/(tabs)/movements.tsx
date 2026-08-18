@@ -129,6 +129,12 @@ export default function MovementsScreen() {
                   ? colors.income
                   : colors.ink
             const clientSuffix = item.client?.name ? ` · ${item.client.name}` : ''
+            const rate = item.currency !== 'ARS' ? item.exchangeRate : undefined
+            const rateLabel = rate
+              ? `${rate.type} ${Number(rate.sell ?? rate.value).toLocaleString('es-AR', {
+                  maximumFractionDigits: 0,
+                })}`
+              : null
             return (
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
@@ -137,6 +143,7 @@ export default function MovementsScreen() {
                     {typeLabel[item.type]} · {item.wallet?.name ?? item.currency}
                     {clientSuffix}
                   </Text>
+                  {rateLabel ? <Text style={styles.meta}>{rateLabel}</Text> : null}
                 </View>
                 <Text style={[styles.amount, { color }]}>
                   {sign}
