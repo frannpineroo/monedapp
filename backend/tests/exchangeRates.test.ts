@@ -206,3 +206,61 @@ describe('GET /exchange-rates', () => {
     expect(res.body.map((r: { type: string }) => r.type)).toEqual(['cripto'])
   })
 })
+
+describe('POST /movements con cotización', () => {
+  beforeEach(() => {
+    process.env.FX_ENABLED = 'true'
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ compra: 1500, venta: 1530 })))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  async function setup() {
+    const token = await registerUser()
+    await request(app)
+      .post('/users/me/onboarding')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ templateId: 'freelancer_software' })
+    const wallets = await request(app).get('/wallets').set('Authorization', `Bearer ${token}`)
+    return { token, wallets: wallets.body as { id: string; currency: string }[] }
+  }
+
+  it('wallet USDT sin exchangeRateType → cripto por default', async () => {
+    const { token, wallets } = await setup()
+    const usdt = wallets.find((w) => w.currency === 'USDT')
+    if (!usdt) return // la plantilla puede no traer billetera USDT
+
+    const res = await request(app)
+      .post('/movements')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ walletId: usdt.id, type: 'income', amount: 100, description: 'Pago cripto' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.exchangeRate.type).toBe('cripto')
+  })
+
+  it('wallet USD con exchangeRateType mep → snapshot mep en la respuesta', async () => {
+    const { token, wallets } = await setup()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+
+    const res = await request(app)
+      .post('/movements')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        walletId: usd.id,
+        type: 'income',
+        amount: 200,
+        description: 'Cobro cliente',
+        exchangeRateType: 'mep',
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.exchangeRate.type).toBe('mep')
+    expect(Number(res.body.exchangeRate.sell)).toBeGreaterThan(0)
+
+    const list = await request(app).get('/movements').set('Authorization', `Bearer ${token}`)
+    expect(list.body[0].exchangeRate.type).toBe('mep')
+  })
+})

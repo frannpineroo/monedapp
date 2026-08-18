@@ -8,6 +8,7 @@ import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { paramId } from '../lib/params'
 import { createLedgerForMovement } from '../services/ledgerService'
 import {
+  defaultTypeForCurrency,
   parseExchangeRateType,
   resolveExchangeRateId,
 } from '../services/exchangeRateService'
@@ -18,6 +19,9 @@ router.use(requireAuth)
 const movementInclude = {
   wallet: { select: { id: true, name: true, currency: true } },
   client: { select: { id: true, name: true } },
+  exchangeRate: {
+    select: { id: true, type: true, value: true, buy: true, sell: true, source: true, date: true },
+  },
 } as const
 
 function parseMovementType(value: unknown): MovementType {
@@ -86,12 +90,16 @@ router.post(
       throw new AppError(400, 'amount debe ser un número mayor a 0')
     }
     const movementDate = parseDate(date ?? new Date().toISOString())
-    const rateType = parseExchangeRateType(exchangeRateType)
 
     const wallet = await prisma.wallet.findFirst({
       where: { id: walletId, userId },
     })
     if (!wallet) throw new AppError(404, 'Billetera no encontrada')
+
+    const rateType =
+      exchangeRateType === undefined || exchangeRateType === null
+        ? defaultTypeForCurrency(wallet.currency)
+        : parseExchangeRateType(exchangeRateType)
 
     let toWalletAccountId: string | null = null
     if (movementType === MovementType.transfer) {

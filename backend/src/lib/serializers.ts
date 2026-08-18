@@ -24,6 +24,15 @@ export function serializeMovement(
   movement: Movement & {
     wallet?: { id: string; name: string; currency: string }
     client?: { id: string; name: string } | null
+    exchangeRate?: {
+      id: string
+      type: string
+      value: unknown
+      buy: unknown
+      sell: unknown
+      source: string
+      date: Date
+    } | null
   }
 ) {
   return {
@@ -44,6 +53,17 @@ export function serializeMovement(
       : undefined,
     client: movement.client
       ? { id: movement.client.id, name: movement.client.name }
+      : undefined,
+    exchangeRate: movement.exchangeRate
+      ? {
+          id: movement.exchangeRate.id,
+          type: movement.exchangeRate.type,
+          value: movement.exchangeRate.value,
+          buy: movement.exchangeRate.buy,
+          sell: movement.exchangeRate.sell,
+          source: movement.exchangeRate.source,
+          date: movement.exchangeRate.date,
+        }
       : undefined,
   }
 }
