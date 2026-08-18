@@ -29,6 +29,7 @@ enum ExchangeRateType {
   oficial
   blue
   mep
+  cripto
 }
 
 model User {
@@ -118,6 +119,8 @@ model ExchangeRate {
   type      ExchangeRateType
   currency  Currency
   value     Decimal          @db.Decimal(18, 6)
+  buy       Decimal?         @db.Decimal(18, 6)
+  sell      Decimal?         @db.Decimal(18, 6)
   source    String
   createdAt DateTime         @default(now())
 

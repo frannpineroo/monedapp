@@ -6,6 +6,7 @@ const STUB_RATES: Record<ExchangeRateType, number> = {
   oficial: 980,
   blue: 1280,
   mep: 1210,
+  cripto: 1300,
 }
 
 function dateOnly(date: Date): Date {
@@ -75,7 +76,7 @@ export async function resolveExchangeRateId(
 export function parseExchangeRateType(value: unknown): ExchangeRateType {
   if (value === undefined || value === null) return ExchangeRateType.blue
   if (typeof value !== 'string' || !(value in ExchangeRateType)) {
-    throw new AppError(400, 'Tipo de cotización inválido (oficial|blue|mep)')
+    throw new AppError(400, 'Tipo de cotización inválido (oficial|blue|mep|cripto)')
   }
   return value as ExchangeRateType
 }
