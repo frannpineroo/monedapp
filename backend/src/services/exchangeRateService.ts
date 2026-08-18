@@ -76,7 +76,21 @@ export async function ensureRateForDate(
     })
   }
 
-  // 4. y 5. (fallback DB y stub) llegan en la Task 6.
+  // 4. Última cotización conocida de esa moneda y tipo (nunca una stub).
+  const previous = await prisma.exchangeRate.findFirst({
+    where: { currency, type, date: { lt: d }, source: { not: 'stub' } },
+    orderBy: { date: 'desc' },
+  })
+
+  if (previous) {
+    return upsertRate(d, type, currency, {
+      buy: Number(previous.buy ?? previous.value),
+      sell: Number(previous.sell ?? previous.value),
+      source: 'db-fallback',
+    })
+  }
+
+  // 5. Último recurso: constante, para que el movimiento nunca falle.
   return upsertRate(d, type, currency, {
     buy: STUB_RATES[type],
     sell: STUB_RATES[type],

@@ -84,3 +84,48 @@ describe('ensureRateForDate — cascada', () => {
     expect(cached.source).toBe('dolarapi')
   })
 })
+
+/** Fecha pasada única, para que cada corrida escriba filas propias. */
+function uniquePastDate() {
+  const daysFrom2000 = 1 + Math.floor(Math.random() * 7000)
+  return new Date(Date.UTC(2000, 0, daysFrom2000))
+}
+
+describe('ensureRateForDate — fallbacks', () => {
+  beforeEach(() => {
+    process.env.FX_ENABLED = 'true'
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('sin red + fila previa en DB → db-fallback con el valor previo', async () => {
+    const previous = uniquePastDate()
+    const target = new Date(previous.getTime() + 86_400_000)
+
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ compra: 900, venta: 950 })))
+    await ensureRateForDate(previous, Currency.USD, 'mep')
+
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('network down')
+    }))
+    const rate = await ensureRateForDate(target, Currency.USD, 'mep')
+
+    expect(rate.source).toBe('db-fallback')
+    expect(Number(rate.value)).toBe(950)
+    expect(Number(rate.buy)).toBe(900)
+  })
+
+  it('sin red y sin filas previas → stub', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('network down')
+    }))
+
+    // 1970: no hay ninguna fila anterior posible en la tabla.
+    const rate = await ensureRateForDate(new Date(Date.UTC(1970, 0, 2)), Currency.USD, 'mep')
+
+    expect(rate.source).toBe('stub')
+    expect(Number(rate.value)).toBe(1210)
+  })
+})
