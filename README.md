@@ -79,8 +79,8 @@ npx expo start
 | CRUD | `/wallets` `/clients` | Auth; sin exponer cuentas internas |
 | CRUD | `/movements` | Genera partida doble oculta |
 | GET | `/reports/balance-by-wallet` | Saldos por billetera |
-| GET | `/exchange-rates?currency=USD&date=YYYY-MM-DD` | Stub oficial/blue/mep |
+| GET | `/exchange-rates?currency=USD&date=YYYY-MM-DD` | Cotización real (oficial/blue/mep/cripto) con caché y fallback |
 
 ## Fuera de este core
 
-Integraciones (MP/Stripe/Hotmart), reportes monotributo, freemium flags, cotización real, módulos Swift nativos.
+Integraciones (MP/Stripe/Hotmart), reportes monotributo, freemium flags, módulos Swift nativos.
