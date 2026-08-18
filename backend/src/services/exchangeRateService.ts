@@ -100,19 +100,20 @@ export async function ensureRateForDate(
 
 export async function getRates(currency: Currency, date: Date) {
   const d = dateOnly(date)
-  const types = Object.values(ExchangeRateType)
+  const types = typesForCurrency(currency)
 
-  const rates = []
-  for (const type of types) {
-    rates.push(await ensureRateForDate(d, currency, type))
+  // ARS no tiene tipos: se devuelve la fila fija para que la app tenga algo que mostrar.
+  if (types.length === 0) {
+    return [await ensureRateForDate(d, currency, ExchangeRateType.blue)]
   }
-  return rates
+
+  return Promise.all(types.map((type) => ensureRateForDate(d, currency, type)))
 }
 
 export async function resolveExchangeRateId(
   currency: Currency,
   date: Date,
-  type: ExchangeRateType = ExchangeRateType.blue
+  type: ExchangeRateType = defaultTypeForCurrency(currency)
 ): Promise<string> {
   const rate = await ensureRateForDate(date, currency, type)
   return rate.id

@@ -4,6 +4,7 @@ import { Currency } from '@prisma/client'
 import {
   defaultTypeForCurrency,
   ensureRateForDate,
+  getRates,
   parseExchangeRateType,
   typesForCurrency,
 } from '../src/services/exchangeRateService'
@@ -127,5 +128,33 @@ describe('ensureRateForDate — fallbacks', () => {
 
     expect(rate.source).toBe('stub')
     expect(Number(rate.value)).toBe(1210)
+  })
+})
+
+describe('getRates', () => {
+  beforeEach(() => {
+    process.env.FX_ENABLED = 'true'
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ compra: 1500, venta: 1530 })))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('USD → oficial, blue y mep', async () => {
+    const rates = await getRates(Currency.USD, uniquePastDate())
+    expect(rates.map((r) => r.type).sort()).toEqual(['blue', 'mep', 'oficial'])
+  })
+
+  it('USDT → solo cripto', async () => {
+    const rates = await getRates(Currency.USDT, uniquePastDate())
+    expect(rates.map((r) => r.type)).toEqual(['cripto'])
+  })
+
+  it('ARS → una fila fija en 1', async () => {
+    const rates = await getRates(Currency.ARS, uniquePastDate())
+    expect(rates).toHaveLength(1)
+    expect(Number(rates[0].value)).toBe(1)
+    expect(rates[0].source).toBe('fixed')
   })
 })
