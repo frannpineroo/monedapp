@@ -1,6 +1,7 @@
 import { Currency, ExchangeRateType, Prisma } from '@prisma/client'
 import { prisma } from '../prisma/prisma'
 import { AppError } from '../lib/errors'
+import { fetchHistoricalRate, fetchLiveRate, type FxQuote } from './fxProvider'
 
 const STUB_RATES: Record<ExchangeRateType, number> = {
   oficial: 980,
@@ -23,43 +24,63 @@ export function typesForCurrency(currency: Currency): ExchangeRateType[] {
   return [ExchangeRateType.oficial, ExchangeRateType.blue, ExchangeRateType.mep]
 }
 
+async function upsertRate(
+  d: Date,
+  type: ExchangeRateType,
+  currency: Currency,
+  values: { buy: number; sell: number; source: string }
+) {
+  const data = {
+    value: new Prisma.Decimal(values.sell),
+    buy: new Prisma.Decimal(values.buy),
+    sell: new Prisma.Decimal(values.sell),
+    source: values.source,
+  }
+
+  return prisma.exchangeRate.upsert({
+    where: { date_type_currency: { date: d, type, currency } },
+    create: { date: d, type, currency, ...data },
+    update: data,
+  })
+}
+
 export async function ensureRateForDate(
   date: Date,
   currency: Currency,
-  type: ExchangeRateType = ExchangeRateType.blue
+  type: ExchangeRateType = defaultTypeForCurrency(currency)
 ) {
+  const d = dateOnly(date)
+
+  // 1. ARS no cotiza contra sí mismo.
   if (currency === Currency.ARS) {
-    const d = dateOnly(date)
-    return prisma.exchangeRate.upsert({
-      where: {
-        date_type_currency: { date: d, type, currency: Currency.ARS },
-      },
-      create: {
-        date: d,
-        type,
-        currency: Currency.ARS,
-        value: new Prisma.Decimal(1),
-        source: 'stub',
-      },
-      update: {},
+    return upsertRate(d, type, Currency.ARS, { buy: 1, sell: 1, source: 'fixed' })
+  }
+
+  // 2. Caché: cualquier fila que no sea stub ya sirve.
+  const cached = await prisma.exchangeRate.findUnique({
+    where: { date_type_currency: { date: d, type, currency } },
+  })
+  if (cached && cached.source !== 'stub') return cached
+
+  // 3. Red: hoy → cotización actual; fecha pasada → histórica.
+  const isToday = d.getTime() >= dateOnly(new Date()).getTime()
+  const quote: FxQuote | null = isToday
+    ? await fetchLiveRate(type)
+    : await fetchHistoricalRate(type, d)
+
+  if (quote) {
+    return upsertRate(d, type, currency, {
+      buy: quote.buy,
+      sell: quote.sell,
+      source: quote.source,
     })
   }
 
-  const d = dateOnly(date)
-  const value = STUB_RATES[type]
-
-  return prisma.exchangeRate.upsert({
-    where: {
-      date_type_currency: { date: d, type, currency },
-    },
-    create: {
-      date: d,
-      type,
-      currency,
-      value: new Prisma.Decimal(value),
-      source: 'stub',
-    },
-    update: {},
+  // 4. y 5. (fallback DB y stub) llegan en la Task 6.
+  return upsertRate(d, type, currency, {
+    buy: STUB_RATES[type],
+    sell: STUB_RATES[type],
+    source: 'stub',
   })
 }
 
