@@ -40,6 +40,17 @@ export type Client = {
   updatedAt: string
 }
 
+export type ExchangeRate = {
+  id: string
+  date: string
+  type: 'oficial' | 'blue' | 'mep' | 'cripto'
+  currency: string
+  value: string | number
+  buy: string | number | null
+  sell: string | number | null
+  source: 'dolarapi' | 'argentinadatos' | 'db-fallback' | 'stub' | 'fixed'
+}
+
 export type Movement = {
   id: string
   walletId: string
@@ -52,4 +63,5 @@ export type Movement = {
   date: string
   wallet?: { id: string; name: string; currency: string }
   client?: { id: string; name: string } | null
+  exchangeRate?: ExchangeRate
 }
