@@ -8,6 +8,7 @@ import {
   getIntegrationStatus,
   startConnect,
 } from '../services/mercadopago/mpOAuthService'
+import { syncMercadoPago } from '../services/mercadopago/mpSyncService'
 
 const router = Router()
 router.use(requireAuth)
@@ -42,6 +43,24 @@ router.post(
 
     const { mobileRedirectUri } = req.body as { mobileRedirectUri?: unknown }
     res.json(await startConnect(userId, mobileRedirectUri))
+  })
+)
+
+router.post(
+  '/:provider/sync',
+  asyncHandler(async (req, res) => {
+    const { userId } = req as AuthedRequest
+    assertSupportedProvider(providerParam(req.params.provider))
+
+    const { from, to } = req.body as { from?: unknown; to?: unknown }
+    const parseOptionalDate = (value: unknown) =>
+      typeof value === 'string' && !Number.isNaN(new Date(value).getTime())
+        ? new Date(value)
+        : undefined
+
+    res.json(
+      await syncMercadoPago(userId, { from: parseOptionalDate(from), to: parseOptionalDate(to) })
+    )
   })
 )
 

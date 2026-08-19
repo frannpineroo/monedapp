@@ -434,3 +434,48 @@ describe('reembolsos', () => {
     expect(entries.reduce((sum, e) => sum + Number(e.change), 0)).toBe(0)
   })
 })
+
+describe('POST /integrations/mercadopago/sync', () => {
+  const realFetch = httpClient.fetch
+
+  afterEach(() => {
+    httpClient.fetch = realFetch
+  })
+
+  it('la primera corrida crea movimientos y la segunda no crea nada', async () => {
+    const { token, userId } = await registerAndOnboard()
+    const collectorId = String(Date.now() * 1000 + Math.floor(Math.random() * 1000))
+    const { encryptSecret } = await import('../src/lib/crypto')
+    await prisma.integration.create({
+      data: {
+        userId,
+        provider: 'mercadopago',
+        status: 'connected',
+        externalAccountId: collectorId,
+        tokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        credentials: encryptSecret(
+          JSON.stringify({ accessToken: 'APP_USR-access-token', refreshToken: 'TG-refresh' })
+        ),
+      },
+    })
+    httpClient.fetch = fakeMpFetch({
+      search: [approvedPayment({ id: 500000001, collector_id: Number(collectorId) })],
+    }).fetchImpl
+
+    const first = await request(app)
+      .post('/integrations/mercadopago/sync')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+
+    expect(first.status).toBe(200)
+    expect(first.body.created).toBe(2)
+
+    const second = await request(app)
+      .post('/integrations/mercadopago/sync')
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+
+    expect(second.body.created).toBe(0)
+    expect(await prisma.movement.count({ where: { userId } })).toBe(2)
+  })
+})
