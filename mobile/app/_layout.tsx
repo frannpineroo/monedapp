@@ -80,6 +80,15 @@ export default function RootLayout() {
                 headerShadowVisible: false,
               }}
             />
+            <Stack.Screen
+              name="categories"
+              options={{
+                headerShown: true,
+                title: 'Categorías',
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+              }}
+            />
           </Stack>
         </AuthGate>
       </AuthProvider>

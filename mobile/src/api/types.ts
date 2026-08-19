@@ -41,6 +41,12 @@ export type Client = {
   updatedAt: string
 }
 
+export type Category = {
+  id: string
+  name: string
+  kind: 'EXPENSE' | 'INCOME'
+}
+
 export type ExchangeRate = {
   id: string
   date: string
@@ -64,5 +70,6 @@ export type Movement = {
   date: string
   wallet?: { id: string; name: string; currency: string }
   client?: { id: string; name: string } | null
+  category?: { id: string; name: string } | null
   exchangeRate?: ExchangeRate
 }

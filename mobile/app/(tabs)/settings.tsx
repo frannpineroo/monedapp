@@ -1,5 +1,5 @@
 import { apiRequest } from '@/src/api/client'
-import type { Client, Wallet } from '@/src/api/types'
+import type { Category, Client, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { colors } from '@/src/theme'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
@@ -23,9 +23,16 @@ export default function SettingsScreen() {
     enabled: !!accessToken,
   })
 
+  const categories = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => apiRequest<Category[]>('/categories', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+
   const rows = [
     { href: '/wallets' as const, label: 'Billeteras', count: wallets.data?.length },
     { href: '/clients' as const, label: 'Clientes', count: clients.data?.length },
+    { href: '/categories' as const, label: 'Categorías', count: categories.data?.length },
   ]
 
   return (
