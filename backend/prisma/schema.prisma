@@ -47,6 +47,7 @@ model User {
   movements    Movement[]
   integrations Integration[]
   refreshTokens RefreshToken[]
+  oauthStates IntegrationOAuthState[]
 
   @@map("users")
 }
@@ -95,6 +96,9 @@ model Wallet {
   account   Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
   movements Movement[]
 
+  externalProvider String?
+
+  @@unique([userId, externalProvider, currency])
   @@index([userId])
   @@map("wallets")
 }
@@ -156,6 +160,14 @@ model Movement {
   exchangeRate ExchangeRate  @relation(fields: [exchangeRateId], references: [id])
   ledgerEntries LedgerEntry[]
 
+  externalProvider  String?
+  externalId        String?
+  externalStatus    String?
+  externalUpdatedAt DateTime?
+  needsReview       Boolean   @default(false)
+
+  @@unique([userId, externalProvider, externalId])
+  @@index([userId, needsReview])
   @@index([userId])
   @@index([walletId])
   @@index([clientId])
@@ -192,7 +204,45 @@ model Integration {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  externalAccountId String?
+  tokenExpiresAt    DateTime?
+  lastError         String?
+  lastWebhookAt     DateTime?
+
   @@unique([userId, provider])
+  @@unique([provider, externalAccountId])
   @@index([userId])
   @@map("integrations")
+}
+
+model IntegrationOAuthState {
+  id                String    @id @default(cuid())
+  userId            String
+  provider          String
+  state             String    @unique
+  codeVerifier      String
+  mobileRedirectUri String
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("integration_oauth_states")
+}
+
+model IntegrationWebhookEvent {
+  id             String   @id @default(cuid())
+  provider       String
+  notificationId String
+  resourceId     String?
+  status         String   @default("received")
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([provider, notificationId])
+  @@index([provider, status])
+  @@map("integration_webhook_events")
 }
