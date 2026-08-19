@@ -23,7 +23,7 @@ const typeLabel: Record<Movement['type'], string> = {
 }
 
 export default function HomeScreen() {
-  const { accessToken, user, logout } = useAuth()
+  const { accessToken, user } = useAuth()
   const router = useRouter()
 
   const balances = useQuery({
@@ -65,9 +65,6 @@ export default function HomeScreen() {
           <Text style={styles.hello}>Hola</Text>
           <Text style={styles.email}>{user?.email}</Text>
         </View>
-        <Pressable onPress={() => logout()}>
-          <Text style={styles.logout}>Salir</Text>
-        </Pressable>
       </View>
 
       {loading ? (
@@ -182,10 +179,6 @@ const styles = StyleSheet.create({
   email: {
     color: colors.muted,
     marginTop: 2,
-  },
-  logout: {
-    color: colors.accent,
-    fontWeight: '600',
   },
   sectionLabel: {
     fontSize: 14,
