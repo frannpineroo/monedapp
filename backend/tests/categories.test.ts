@@ -193,3 +193,90 @@ describe('PATCH y DELETE /categories/:id', () => {
     expect(res.body.error).toBe('No se puede borrar la última categoría de este tipo')
   })
 })
+
+describe('POST /movements con categoría', () => {
+  it('el asiento apunta a la categoría elegida', async () => {
+    const { token, wallets } = await setupUser()
+    const categories = await request(app).get('/categories?kind=EXPENSE').set(auth(token))
+    const category = (categories.body as { id: string; name: string }[])[0]
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: wallets[0].id,
+        type: 'expense',
+        amount: 1000,
+        description: 'Licencia anual',
+        categoryId: category.id,
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.category).toEqual({ id: category.id, name: category.name })
+
+    const entries = await prisma.ledgerEntry.findMany({ where: { movementId: res.body.id } })
+    expect(entries.map((e) => e.accountId)).toContain(category.id)
+    expect(entries.reduce((sum, e) => sum + Number(e.change), 0)).toBe(0)
+  })
+
+  it('categoría de kind equivocado → 400', async () => {
+    const { token, wallets } = await setupUser()
+    const income = await request(app).get('/categories?kind=INCOME').set(auth(token))
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: wallets[0].id,
+        type: 'expense',
+        amount: 100,
+        description: 'Mal categorizado',
+        categoryId: (income.body as { id: string }[])[0].id,
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('categoría de otro usuario → 404', async () => {
+    const owner = await setupUser()
+    const intruder = await setupUser()
+    const categories = await request(app).get('/categories?kind=EXPENSE').set(auth(owner.token))
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(intruder.token))
+      .send({
+        walletId: intruder.wallets[0].id,
+        type: 'expense',
+        amount: 100,
+        description: 'Ajena',
+        categoryId: (categories.body as { id: string }[])[0].id,
+      })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('transferencia con categoryId → 400', async () => {
+    const { token, wallets } = await setupUser()
+    const categories = await request(app).get('/categories?kind=EXPENSE').set(auth(token))
+    const ars = wallets.filter((w) => w.currency === 'ARS')
+    const destino = ars[1] ?? (await request(app)
+      .post('/wallets')
+      .set(auth(token))
+      .send({ name: 'Otra ARS', currency: 'ARS' })).body
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: ars[0].id,
+        toWalletId: destino.id,
+        type: 'transfer',
+        amount: 100,
+        description: 'Pase interno',
+        categoryId: (categories.body as { id: string }[])[0].id,
+      })
+
+    expect(res.status).toBe(400)
+  })
+})

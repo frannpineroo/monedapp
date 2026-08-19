@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { Currency, MovementType, Prisma } from '@prisma/client'
+import { AccountKind, Currency, MovementType, Prisma } from '@prisma/client'
 import { prisma } from '../prisma/prisma'
 import { asyncHandler } from '../lib/asyncHandler'
 import { AppError } from '../lib/errors'
@@ -30,6 +30,29 @@ function parseMovementType(value: unknown): MovementType {
     throw new AppError(400, 'type inválido (income|expense|transfer)')
   }
   return value as MovementType
+}
+
+async function resolveCategoryAccountId(
+  userId: string,
+  movementType: MovementType,
+  categoryId: unknown
+): Promise<string | null> {
+  if (categoryId === undefined || categoryId === null) return null
+  if (typeof categoryId !== 'string') throw new AppError(400, 'categoryId inválido')
+  if (movementType === MovementType.transfer) {
+    throw new AppError(400, 'Las transferencias no llevan categoría')
+  }
+
+  const category = await prisma.account.findFirst({ where: { id: categoryId, userId } })
+  if (!category) throw new AppError(404, 'Categoría no encontrada')
+
+  const expected =
+    movementType === MovementType.expense ? AccountKind.EXPENSE : AccountKind.INCOME
+  if (category.kind !== expected) {
+    throw new AppError(400, 'La categoría no corresponde al tipo de movimiento')
+  }
+
+  return category.id
 }
 
 function parseDate(value: unknown): Date {
@@ -79,6 +102,7 @@ router.post(
       description,
       date,
       exchangeRateType,
+      categoryId,
     } = req.body as Record<string, unknown>
 
     if (typeof walletId !== 'string') throw new AppError(400, 'walletId es requerido')
@@ -96,6 +120,8 @@ router.post(
       where: { id: walletId, userId },
     })
     if (!wallet) throw new AppError(404, 'Billetera no encontrada')
+
+    const categoryAccountId = await resolveCategoryAccountId(userId, movementType, categoryId)
 
     const rateType =
       exchangeRateType === undefined || exchangeRateType === null
@@ -143,6 +169,7 @@ router.post(
           exchangeRateId,
           description: description.trim(),
           date: movementDate,
+          categoryAccountId,
         },
       })
 
@@ -154,6 +181,7 @@ router.post(
         currency: created.currency,
         walletAccountId: wallet.accountId,
         toWalletAccountId,
+        categoryAccountId,
       })
 
       return tx.movement.findUniqueOrThrow({
