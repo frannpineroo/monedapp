@@ -19,6 +19,7 @@ router.use(requireAuth)
 const movementInclude = {
   wallet: { select: { id: true, name: true, currency: true } },
   client: { select: { id: true, name: true } },
+  categoryAccount: { select: { id: true, name: true } },
   exchangeRate: {
     select: { id: true, type: true, value: true, buy: true, sell: true, source: true, date: true },
   },

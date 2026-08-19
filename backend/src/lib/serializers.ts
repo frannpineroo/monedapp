@@ -25,6 +25,7 @@ export function serializeMovement(
   movement: Movement & {
     wallet?: { id: string; name: string; currency: string }
     client?: { id: string; name: string } | null
+    categoryAccount?: { id: string; name: string } | null
     exchangeRate?: {
       id: string
       type: string
@@ -55,6 +56,9 @@ export function serializeMovement(
     client: movement.client
       ? { id: movement.client.id, name: movement.client.name }
       : undefined,
+    category: movement.categoryAccount
+      ? { id: movement.categoryAccount.id, name: movement.categoryAccount.name }
+      : null,
     exchangeRate: movement.exchangeRate
       ? {
           id: movement.exchangeRate.id,
