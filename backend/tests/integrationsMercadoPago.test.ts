@@ -7,6 +7,7 @@ process.env.MP_REDIRECT_URI ??= 'https://monedapp.test/integrations/mercadopago/
 process.env.MP_WEBHOOK_SECRET ??= 'test-secret'
 process.env.INTEGRATIONS_ENCRYPTION_KEY ??= 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='
 
+import crypto from 'crypto'
 import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app'
@@ -233,5 +234,162 @@ describe('ingestPayment', () => {
 
     expect(result.status).toBe('skipped')
     expect(await prisma.movement.count({ where: { userId, externalProvider: 'mercadopago' } })).toBe(0)
+  })
+})
+
+describe('POST /webhooks/mercadopago', () => {
+  const realFetch = httpClient.fetch
+
+  afterEach(() => {
+    httpClient.fetch = realFetch
+  })
+
+  function signWebhook(dataId: string, requestId = 'req-1', ts = '1704908010') {
+    const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`
+    const v1 = crypto
+      .createHmac('sha256', process.env.MP_WEBHOOK_SECRET!)
+      .update(manifest)
+      .digest('hex')
+    return { 'x-signature': `ts=${ts},v1=${v1}`, 'x-request-id': requestId }
+  }
+
+  /** Deja una Integration conectada apuntando a un collector id único. */
+  async function seedConnectedIntegration(userId: string, externalAccountId: string) {
+    const { encryptSecret } = await import('../src/lib/crypto')
+    await prisma.integration.create({
+      data: {
+        userId,
+        provider: 'mercadopago',
+        status: 'connected',
+        externalAccountId,
+        tokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        credentials: encryptSecret(
+          JSON.stringify({ accessToken: 'APP_USR-access-token', refreshToken: 'TG-refresh' })
+        ),
+      },
+    })
+  }
+
+  function body(paymentId: string, collectorId: string, notificationId: number | string) {
+    return {
+      id: notificationId,
+      live_mode: false,
+      type: 'payment',
+      action: 'payment.created',
+      user_id: Number(collectorId),
+      data: { id: paymentId },
+    }
+  }
+
+  it('pago aprobado firmado → 200 y dos movimientos', async () => {
+    const { userId } = await registerAndOnboard()
+    const collectorId = String(Date.now())
+    await seedConnectedIntegration(userId, collectorId)
+    const payment = approvedPayment({ id: 300000001, collector_id: Number(collectorId) })
+    httpClient.fetch = fakeMpFetch({ payments: { '300000001': payment } }).fetchImpl
+
+    const res = await request(app)
+      .post('/webhooks/mercadopago?data.id=300000001')
+      .set(signWebhook('300000001'))
+      .send(body('300000001', collectorId, 1))
+
+    expect(res.status).toBe(200)
+    const movements = await prisma.movement.findMany({ where: { userId } })
+    expect(movements).toHaveLength(2)
+  })
+
+  it('la misma notificación reentregada no duplica', async () => {
+    const { userId } = await registerAndOnboard()
+    const collectorId = String(Date.now() + 1)
+    await seedConnectedIntegration(userId, collectorId)
+    const payment = approvedPayment({ id: 300000002, collector_id: Number(collectorId) })
+    httpClient.fetch = fakeMpFetch({ payments: { '300000002': payment } }).fetchImpl
+    const notification = body('300000002', collectorId, 2)
+
+    await request(app)
+      .post('/webhooks/mercadopago?data.id=300000002')
+      .set(signWebhook('300000002'))
+      .send(notification)
+    const replay = await request(app)
+      .post('/webhooks/mercadopago?data.id=300000002')
+      .set(signWebhook('300000002'))
+      .send(notification)
+
+    expect(replay.status).toBe(200)
+    expect(await prisma.movement.count({ where: { userId } })).toBe(2)
+  })
+
+  it('payment.updated con otra notification id tampoco duplica', async () => {
+    const { userId } = await registerAndOnboard()
+    const collectorId = String(Date.now() + 2)
+    await seedConnectedIntegration(userId, collectorId)
+    const payment = approvedPayment({ id: 300000003, collector_id: Number(collectorId) })
+    httpClient.fetch = fakeMpFetch({ payments: { '300000003': payment } }).fetchImpl
+
+    await request(app)
+      .post('/webhooks/mercadopago?data.id=300000003')
+      .set(signWebhook('300000003'))
+      .send(body('300000003', collectorId, 3))
+    await request(app)
+      .post('/webhooks/mercadopago?data.id=300000003')
+      .set(signWebhook('300000003', 'req-2'))
+      .send({ ...body('300000003', collectorId, 4), action: 'payment.updated' })
+
+    expect(await prisma.movement.count({ where: { userId } })).toBe(2)
+  })
+
+  it('firma inválida → 401 y ningún movimiento', async () => {
+    const { userId } = await registerAndOnboard()
+    const collectorId = String(Date.now() + 3)
+    await seedConnectedIntegration(userId, collectorId)
+
+    const res = await request(app)
+      .post('/webhooks/mercadopago?data.id=300000004')
+      .set({ 'x-signature': 'ts=1704908010,v1=deadbeef', 'x-request-id': 'req-1' })
+      .send(body('300000004', collectorId, 5))
+
+    expect(res.status).toBe(401)
+    expect(await prisma.movement.count({ where: { userId } })).toBe(0)
+  })
+
+  it('user_id sin integración → 200 y evento ignorado', async () => {
+    const unknownCollector = String(Date.now() + 4)
+
+    const res = await request(app)
+      .post('/webhooks/mercadopago?data.id=300000005')
+      .set(signWebhook('300000005'))
+      .send(body('300000005', unknownCollector, 6))
+
+    expect(res.status).toBe(200)
+    const event = await prisma.integrationWebhookEvent.findFirst({
+      where: { provider: 'mercadopago', notificationId: '6' },
+    })
+    expect(event?.status).toBe('ignored')
+  })
+
+  it('un topic que no es payment se ignora con 200', async () => {
+    const res = await request(app)
+      .post('/webhooks/mercadopago?data.id=300000006')
+      .set(signWebhook('300000006'))
+      .send({ id: 7, type: 'merchant_order', action: 'merchant_order.updated', data: { id: '1' } })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ignored).toBe(true)
+  })
+
+  it('un pago pendiente no crea movimientos', async () => {
+    const { userId } = await registerAndOnboard()
+    const collectorId = String(Date.now() + 5)
+    await seedConnectedIntegration(userId, collectorId)
+    const payment = pendingPayment({ id: 300000007, collector_id: Number(collectorId) })
+    httpClient.fetch = fakeMpFetch({ payments: { '300000007': payment } }).fetchImpl
+
+    const res = await request(app)
+      .post('/webhooks/mercadopago?data.id=300000007')
+      .set(signWebhook('300000007'))
+      .send(body('300000007', collectorId, 8))
+
+    expect(res.status).toBe(200)
+    expect(await prisma.movement.count({ where: { userId } })).toBe(0)
   })
 })

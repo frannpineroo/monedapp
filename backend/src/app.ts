@@ -10,6 +10,7 @@ import categoriesRouter from './routes/categories'
 import exchangeRatesRouter from './routes/exchangeRates'
 import integrationsCallbackRouter from './routes/integrationsCallback'
 import integrationsRouter from './routes/integrations'
+import webhooksRouter from './routes/webhooks'
 
 export function createApp() {
   const app = express()
@@ -31,6 +32,7 @@ export function createApp() {
   app.use('/exchange-rates', exchangeRatesRouter)
   app.use('/integrations', integrationsCallbackRouter)
   app.use('/integrations', integrationsRouter)
+  app.use('/webhooks', webhooksRouter)
 
   return app
 }
