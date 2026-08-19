@@ -89,6 +89,60 @@ npx expo start
 | DELETE | `/wallets/:id` | 400 si la billetera tiene movimientos |
 | DELETE | `/clients/:id` | 400 si el cliente tiene movimientos |
 
+## Integraciones
+
+Mercado Pago se conecta con OAuth `authorization_code` + PKCE. El backend es el `redirect_uri` (MP exige HTTPS estático) y después rebota al deep link `monedapp://`. Los tokens se guardan cifrados (AES-256-GCM) en `Integration.credentials` y **nunca** salen por la API.
+
+### Variables
+
+```
+MP_CLIENT_ID=
+MP_CLIENT_SECRET=
+MP_REDIRECT_URI=https://<host-publico>/integrations/mercadopago/callback
+MP_WEBHOOK_SECRET=
+MP_AUTH_BASE_URL=https://auth.mercadopago.com.ar
+MP_API_BASE_URL=https://api.mercadopago.com
+INTEGRATIONS_ENCRYPTION_KEY=
+MOBILE_DEEP_LINK_SCHEME=monedapp
+```
+
+Generar la clave de cifrado:
+
+```bash
+openssl rand -base64 32
+```
+
+Tiene que decodificar a exactamente 32 bytes.
+
+### Alta de la aplicación en Mercado Pago
+
+1. Crear la app en el panel de desarrolladores.
+2. **Habilitar PKCE**: si no, MP rechaza el `code_challenge`.
+3. Registrar `redirect_uri` **byte-exacto** contra `MP_REDIRECT_URI`. `monedapp://` no se le pasa nunca a MP.
+4. Configurar la notificación de `payment` a `https://<host>/webhooks/mercadopago` y copiar el secreto a `MP_WEBHOOK_SECRET`.
+
+### Endpoints
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/integrations` | Estado de las integraciones (nunca devuelve credenciales) |
+| POST | `/integrations/mercadopago/connect` | Devuelve la URL de autorización con PKCE |
+| GET | `/integrations/mercadopago/callback` | Público: MP vuelve acá y rebota al deep link |
+| POST | `/integrations/mercadopago/sync` | Backfill manual (30 días por defecto) |
+| DELETE | `/integrations/mercadopago` | Desconecta sin borrar movimientos |
+| POST | `/webhooks/mercadopago` | Webhook firmado HMAC-SHA256 |
+
+El access token de MP vive 180 días y el refresh es lazy: si no hay pagos por 180 días la conexión se cae y la pantalla pide "Reconectá Mercado Pago". Un reembolso **no** borra el movimiento original: postea un asiento compensatorio.
+
+### Smoke real (pendiente)
+
+No hay URL HTTPS pública todavía, así que MP no puede llegar al callback ni al webhook. El circuito se verificó con requests sintéticos firmados. Cuando haya host público:
+
+1. Dar de alta la aplicación y habilitar PKCE.
+2. Setear `MP_REDIRECT_URI=https://<host>/integrations/mercadopago/callback` — byte-exacto contra el registrado.
+3. Apuntar la notificación de `payment` a `https://<host>/webhooks/mercadopago` y copiar el secreto.
+4. Conectar desde la app con una cuenta de prueba, generar un pago y verificar que aparece en la bandeja "Revisar" con el monto bruto y su comisión.
+
 ## Fuera de este core
 
-Integraciones (MP/Stripe/Hotmart), reportes monotributo, freemium flags, módulos Swift nativos.
+Stripe/Hotmart, reportes monotributo, freemium flags, módulos Swift nativos.
