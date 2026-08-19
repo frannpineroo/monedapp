@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { AccountKind, Currency, MovementType, Prisma } from '@prisma/client'
 import { prisma } from '../prisma/prisma'
 import { asyncHandler } from '../lib/asyncHandler'
@@ -6,7 +6,7 @@ import { AppError } from '../lib/errors'
 import { serializeMovement } from '../lib/serializers'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { paramId } from '../lib/params'
-import { createLedgerForMovement } from '../services/ledgerService'
+import { createInvoiceLedger, createLedgerForMovement } from '../services/ledgerService'
 import {
   defaultTypeForCurrency,
   parseExchangeRateType,
@@ -63,6 +63,65 @@ function parseDate(value: unknown): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
+async function createInvoiceMovement(req: Request, res: Response, userId: string) {
+  const { clientId, walletId, amount, currency, description, date, dueDate, categoryId } =
+    req.body as Record<string, unknown>
+
+  if (walletId !== undefined && walletId !== null) {
+    throw new AppError(400, 'Una factura no lleva billetera')
+  }
+  if (typeof clientId !== 'string') throw new AppError(400, 'clientId es requerido en una factura')
+  if (typeof description !== 'string' || description.trim() === '') {
+    throw new AppError(400, 'description es requerida')
+  }
+  if (typeof currency !== 'string' || !(currency in Currency)) {
+    throw new AppError(400, 'currency es requerida en una factura (ARS|USD|USDT)')
+  }
+  const amountNum = Number(amount)
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    throw new AppError(400, 'amount debe ser un número mayor a 0')
+  }
+
+  const client = await prisma.client.findFirst({ where: { id: clientId, userId } })
+  if (!client) throw new AppError(404, 'Cliente no encontrado')
+
+  const movementDate = parseDate(date ?? new Date().toISOString())
+  const due = dueDate === undefined || dueDate === null ? null : parseDate(dueDate)
+  const categoryAccountId = await resolveCategoryAccountId(userId, MovementType.income, categoryId)
+  const exchangeRateId = await resolveExchangeRateId(currency as Currency, movementDate)
+
+  const movement = await prisma.$transaction(async (tx) => {
+    const created = await tx.movement.create({
+      data: {
+        userId,
+        walletId: null,
+        clientId,
+        type: MovementType.invoice,
+        amount: new Prisma.Decimal(amountNum),
+        currency: currency as Currency,
+        exchangeRateId,
+        description: description.trim(),
+        date: movementDate,
+        dueDate: due,
+        categoryAccountId,
+      },
+    })
+
+    await createInvoiceLedger(tx, {
+      userId,
+      movementId: created.id,
+      amount: created.amount,
+      currency: created.currency,
+      exchangeRateId,
+      categoryAccountId,
+    })
+
+    return tx.movement.findUniqueOrThrow({ where: { id: created.id }, include: movementInclude })
+  })
+
+  res.status(201).json(serializeMovement(movement))
+}
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {
@@ -111,11 +170,16 @@ router.post(
       categoryId,
     } = req.body as Record<string, unknown>
 
+    const movementType = parseMovementType(type)
+    if (movementType === MovementType.invoice) {
+      await createInvoiceMovement(req, res, userId)
+      return
+    }
+
     if (typeof walletId !== 'string') throw new AppError(400, 'walletId es requerido')
     if (typeof description !== 'string' || description.trim() === '') {
       throw new AppError(400, 'description es requerida')
     }
-    const movementType = parseMovementType(type)
     const amountNum = Number(amount)
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
       throw new AppError(400, 'amount debe ser un número mayor a 0')

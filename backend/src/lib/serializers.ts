@@ -56,6 +56,7 @@ export function serializeMovement(
     exchangeRateId: movement.exchangeRateId,
     description: movement.description,
     date: movement.date,
+    dueDate: movement.dueDate,
     createdAt: movement.createdAt,
     updatedAt: movement.updatedAt,
     needsReview: movement.needsReview,

@@ -123,3 +123,79 @@ describe('changeArs en asientos normales', () => {
     expect(Number(walletEntry.changeArs)).toBe(Math.round(100 * Number(rate.value) * 100) / 100)
   })
 })
+
+describe('POST /movements type invoice', () => {
+  it('emite la factura sin tocar los saldos de billetera', async () => {
+    const { token, client } = await setupUser()
+    const before = await request(app).get('/reports/balance-by-wallet').set(auth(token))
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 1000,
+        currency: 'USD',
+        dueDate: '2026-09-14',
+        description: 'Sprint 12',
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.walletId).toBeNull()
+    expect(res.body.dueDate).toContain('2026-09-14')
+
+    const after = await request(app).get('/reports/balance-by-wallet').set(auth(token))
+    expect(after.body).toEqual(before.body)
+
+    const entries = await prisma.ledgerEntry.findMany({ where: { movementId: res.body.id } })
+    expect(entries).toHaveLength(2)
+    expect(entries.reduce((sum, e) => sum + Number(e.changeArs), 0)).toBe(0)
+
+    const accounts = await prisma.account.findMany({
+      where: { id: { in: entries.map((e) => e.accountId) } },
+    })
+    expect(accounts.map((a) => a.name)).toContain('Deudores por ventas')
+  })
+
+  it('factura sin cliente → 400', async () => {
+    const { token } = await setupUser()
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'invoice', amount: 1000, currency: 'USD', dueDate: '2026-09-14', description: 'X' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('factura con walletId → 400', async () => {
+    const { token, client, wallets } = await setupUser()
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        walletId: wallets[0].id,
+        amount: 1000,
+        currency: 'USD',
+        dueDate: '2026-09-14',
+        description: 'X',
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('factura sin moneda → 400', async () => {
+    const { token, client } = await setupUser()
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'invoice', clientId: client.id, amount: 1000, dueDate: '2026-09-14', description: 'X' })
+
+    expect(res.status).toBe(400)
+  })
+})

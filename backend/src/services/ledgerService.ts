@@ -1,6 +1,6 @@
 import { Currency, MovementType, Prisma } from '@prisma/client'
 import { AppError } from '../lib/errors'
-import { getDefaultExpenseAccountId, getDefaultIncomeAccountId } from './onboardingService'
+import { getDefaultExpenseAccountId, getDefaultIncomeAccountId, ensureSystemAccounts } from './onboardingService'
 
 type Tx = Prisma.TransactionClient
 
@@ -145,4 +145,32 @@ export async function createLedgerForMovement(
   }
 
   await writeEntries(tx, params.movementId, entries)
+}
+
+export async function createInvoiceLedger(
+  tx: Tx,
+  params: {
+    userId: string
+    movementId: string
+    amount: Prisma.Decimal
+    currency: Currency
+    exchangeRateId: string
+    categoryAccountId?: string | null
+  }
+) {
+  const amount = Number(params.amount)
+  if (!(amount > 0)) throw new AppError(400, 'El monto debe ser mayor a 0')
+
+  const { receivablesAccountId } = await ensureSystemAccounts(params.userId)
+  const incomeAccountId =
+    params.categoryAccountId ?? (await getDefaultIncomeAccountId(tx, params.userId))
+
+  const rate = await tx.exchangeRate.findUniqueOrThrow({ where: { id: params.exchangeRateId } })
+  const ars = round2(amount * Number(rate.value))
+
+  // La factura no toca ninguna billetera: por eso balance-by-wallet no se mueve.
+  await writeEntries(tx, params.movementId, [
+    { accountId: receivablesAccountId, change: amount, currency: params.currency, changeArs: ars },
+    { accountId: incomeAccountId, change: -amount, currency: params.currency, changeArs: -ars },
+  ])
 }
