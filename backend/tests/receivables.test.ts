@@ -99,3 +99,27 @@ describe('cuentas de sistema', () => {
     expect(accounts.find((a) => a.name === 'Diferencia de cambio')?.kind).toBe('INCOME')
   })
 })
+
+describe('changeArs en asientos normales', () => {
+  it('un ingreso en USD deja changeArs = monto × cotización y suma 0 en ARS', async () => {
+    const { token, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+
+    const created = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ walletId: usd.id, type: 'income', amount: 100, description: 'Cobro USD' })
+
+    expect(created.status).toBe(201)
+
+    const entries = await prisma.ledgerEntry.findMany({ where: { movementId: created.body.id } })
+    const rate = await prisma.exchangeRate.findUniqueOrThrow({
+      where: { id: created.body.exchangeRateId },
+    })
+
+    expect(entries).toHaveLength(2)
+    expect(entries.reduce((sum, e) => sum + Number(e.changeArs), 0)).toBe(0)
+    const walletEntry = entries.find((e) => Number(e.change) > 0)!
+    expect(Number(walletEntry.changeArs)).toBe(Math.round(100 * Number(rate.value) * 100) / 100)
+  })
+})

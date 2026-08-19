@@ -77,6 +77,7 @@ export async function ingestPayment(userId: string, payment: MpPayment): Promise
           type: movement.type,
           amount: movement.amount,
           currency: movement.currency,
+          exchangeRateId,
           walletAccountId: wallet.accountId,
           categoryAccountId,
         })

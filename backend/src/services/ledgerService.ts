@@ -4,11 +4,62 @@ import { getDefaultExpenseAccountId, getDefaultIncomeAccountId } from './onboard
 
 type Tx = Prisma.TransactionClient
 
-function assertBalanced(entries: { change: Prisma.Decimal | number }[]) {
-  const total = entries.reduce((sum, e) => sum + Number(e.change), 0)
-  if (Math.round(total * 100) / 100 !== 0) {
+export type LedgerEntryInput = {
+  accountId: string
+  change: number
+  currency: Currency
+  changeArs: number
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+/**
+ * El ARS es la única unidad comparable entre patas: sumar montos de monedas
+ * distintas (como se hacía antes) es un bug silencioso en cuanto aparece un
+ * asiento multi-moneda, que es exactamente lo que trae el cobro con diferencia
+ * de cambio.
+ */
+export function assertBalanced(
+  entries: LedgerEntryInput[],
+  opts: { allowsMultiCurrency?: boolean } = {}
+) {
+  const totalArs = entries.reduce((sum, e) => sum + e.changeArs, 0)
+  if (round2(totalArs) !== 0) {
     throw new AppError(500, 'Asiento desbalanceado')
   }
+
+  if (opts.allowsMultiCurrency) return
+
+  const byCurrency = new Map<Currency, number>()
+  for (const entry of entries) {
+    byCurrency.set(entry.currency, (byCurrency.get(entry.currency) ?? 0) + entry.change)
+  }
+  for (const total of byCurrency.values()) {
+    if (round2(total) !== 0) {
+      throw new AppError(500, 'Asiento desbalanceado')
+    }
+  }
+}
+
+export async function writeEntries(
+  tx: Tx,
+  movementId: string,
+  entries: LedgerEntryInput[],
+  opts: { allowsMultiCurrency?: boolean } = {}
+) {
+  assertBalanced(entries, opts)
+
+  await tx.ledgerEntry.createMany({
+    data: entries.map((e) => ({
+      movementId,
+      accountId: e.accountId,
+      change: e.change,
+      changeArs: e.changeArs,
+      currency: e.currency,
+    })),
+  })
 }
 
 export async function createLedgerForMovement(
@@ -19,6 +70,7 @@ export async function createLedgerForMovement(
     type: MovementType
     amount: Prisma.Decimal
     currency: Currency
+    exchangeRateId: string
     walletAccountId: string
     toWalletAccountId?: string | null
     categoryAccountId?: string | null
@@ -29,21 +81,45 @@ export async function createLedgerForMovement(
     throw new AppError(400, 'El monto debe ser mayor a 0')
   }
 
-  const entries: { accountId: string; change: number; currency: Currency }[] = []
+  const rate = await tx.exchangeRate.findUniqueOrThrow({ where: { id: params.exchangeRateId } })
+  const rateValue = Number(rate.value)
+  const arsOf = (value: number) => round2(value * rateValue)
+
+  const entries: LedgerEntryInput[] = []
 
   if (params.type === MovementType.income) {
     const incomeAccountId =
       params.categoryAccountId ?? (await getDefaultIncomeAccountId(tx, params.userId))
     entries.push(
-      { accountId: params.walletAccountId, change: amount, currency: params.currency },
-      { accountId: incomeAccountId, change: -amount, currency: params.currency }
+      {
+        accountId: params.walletAccountId,
+        change: amount,
+        currency: params.currency,
+        changeArs: arsOf(amount),
+      },
+      {
+        accountId: incomeAccountId,
+        change: -amount,
+        currency: params.currency,
+        changeArs: -arsOf(amount),
+      }
     )
   } else if (params.type === MovementType.expense) {
     const expenseAccountId =
       params.categoryAccountId ?? (await getDefaultExpenseAccountId(tx, params.userId))
     entries.push(
-      { accountId: expenseAccountId, change: amount, currency: params.currency },
-      { accountId: params.walletAccountId, change: -amount, currency: params.currency }
+      {
+        accountId: expenseAccountId,
+        change: amount,
+        currency: params.currency,
+        changeArs: arsOf(amount),
+      },
+      {
+        accountId: params.walletAccountId,
+        change: -amount,
+        currency: params.currency,
+        changeArs: -arsOf(amount),
+      }
     )
   } else if (params.type === MovementType.transfer) {
     if (!params.toWalletAccountId) {
@@ -53,19 +129,20 @@ export async function createLedgerForMovement(
       throw new AppError(400, 'Las billeteras de origen y destino deben ser distintas')
     }
     entries.push(
-      { accountId: params.toWalletAccountId, change: amount, currency: params.currency },
-      { accountId: params.walletAccountId, change: -amount, currency: params.currency }
+      {
+        accountId: params.toWalletAccountId,
+        change: amount,
+        currency: params.currency,
+        changeArs: arsOf(amount),
+      },
+      {
+        accountId: params.walletAccountId,
+        change: -amount,
+        currency: params.currency,
+        changeArs: -arsOf(amount),
+      }
     )
   }
 
-  assertBalanced(entries)
-
-  await tx.ledgerEntry.createMany({
-    data: entries.map((e) => ({
-      movementId: params.movementId,
-      accountId: e.accountId,
-      change: e.change,
-      currency: e.currency,
-    })),
-  })
+  await writeEntries(tx, params.movementId, entries)
 }

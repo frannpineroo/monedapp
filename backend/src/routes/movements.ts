@@ -185,6 +185,7 @@ router.post(
         type: movementType,
         amount: created.amount,
         currency: created.currency,
+        exchangeRateId,
         walletAccountId: wallet.accountId,
         toWalletAccountId,
         categoryAccountId,
@@ -259,6 +260,7 @@ router.patch(
 
     if (categoryId !== undefined) {
       if (!existing.wallet) throw new AppError(400, 'El movimiento no tiene billetera')
+      const walletAccountId = existing.wallet.accountId
       const categoryAccountId = await resolveCategoryAccountId(userId, existing.type, categoryId)
 
       const movement = await prisma.$transaction(async (tx) => {
@@ -280,7 +282,8 @@ router.patch(
           type: updated.type,
           amount: updated.amount,
           currency: updated.currency,
-          walletAccountId: existing.wallet.accountId,
+          exchangeRateId: updated.exchangeRateId,
+          walletAccountId,
           categoryAccountId,
         })
 
