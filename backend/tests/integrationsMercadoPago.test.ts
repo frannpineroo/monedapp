@@ -479,3 +479,33 @@ describe('POST /integrations/mercadopago/sync', () => {
     expect(await prisma.movement.count({ where: { userId } })).toBe(2)
   })
 })
+
+describe('bandeja de revisión', () => {
+  it('filtra por needsReview y el PATCH limpia la marca', async () => {
+    const { ingestPayment } = await import('../src/services/mercadopago/mpIngestionService')
+    const { token, userId } = await registerAndOnboard()
+    await ingestPayment(userId, approvedPayment({ id: 600000001 }))
+
+    const pending = await request(app)
+      .get('/movements?needsReview=true')
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(pending.status).toBe(200)
+    expect(pending.body).toHaveLength(1)
+    expect(pending.body[0].source).toBe('mercadopago')
+    expect(pending.body[0].needsReview).toBe(true)
+
+    const confirmed = await request(app)
+      .patch(`/movements/${pending.body[0].id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ description: 'Cobro Estudio Contable', needsReview: false })
+
+    expect(confirmed.status).toBe(200)
+    expect(confirmed.body.needsReview).toBe(false)
+
+    const after = await request(app)
+      .get('/movements?needsReview=true')
+      .set('Authorization', `Bearer ${token}`)
+    expect(after.body).toHaveLength(0)
+  })
+})

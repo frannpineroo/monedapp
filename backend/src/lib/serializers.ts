@@ -58,6 +58,8 @@ export function serializeMovement(
     date: movement.date,
     createdAt: movement.createdAt,
     updatedAt: movement.updatedAt,
+    needsReview: movement.needsReview,
+    source: movement.externalProvider ?? 'manual',
     wallet: movement.wallet
       ? { id: movement.wallet.id, name: movement.wallet.name, currency: movement.wallet.currency }
       : undefined,

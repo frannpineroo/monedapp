@@ -67,7 +67,7 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthedRequest
-    const { walletId, clientId, categoryId, type, from, to } = req.query
+    const { walletId, clientId, categoryId, type, from, to, needsReview, source } = req.query
 
     const where: Prisma.MovementWhereInput = { userId }
 
@@ -75,6 +75,11 @@ router.get(
     if (typeof clientId === 'string') where.clientId = clientId
     if (typeof categoryId === 'string') where.categoryAccountId = categoryId
     if (typeof type === 'string') where.type = parseMovementType(type)
+    if (needsReview === 'true') where.needsReview = true
+    if (needsReview === 'false') where.needsReview = false
+    if (typeof source === 'string') {
+      where.externalProvider = source === 'manual' ? null : source
+    }
     if (typeof from === 'string' || typeof to === 'string') {
       where.date = {}
       if (typeof from === 'string') where.date.gte = parseDate(from)
@@ -220,7 +225,7 @@ router.patch(
     })
     if (!existing) throw new AppError(404, 'Movimiento no encontrado')
 
-    const { description, date, clientId, categoryId } = req.body as Record<string, unknown>
+    const { description, date, clientId, categoryId, needsReview } = req.body as Record<string, unknown>
     const data: Prisma.MovementUpdateInput = {}
 
     if (description !== undefined) {
@@ -228,6 +233,12 @@ router.patch(
         throw new AppError(400, 'description inválida')
       }
       data.description = description.trim()
+    }
+    if (needsReview !== undefined) {
+      if (typeof needsReview !== 'boolean') {
+        throw new AppError(400, 'needsReview debe ser booleano')
+      }
+      data.needsReview = needsReview
     }
     if (date !== undefined) {
       data.date = parseDate(date)
