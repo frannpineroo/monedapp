@@ -78,6 +78,10 @@ npx expo start
 | POST | `/users/me/onboarding` | Auth |
 | CRUD | `/wallets` `/clients` | Auth; sin exponer cuentas internas |
 | CRUD | `/movements` | Genera partida doble oculta |
+| POST | `/movements` con `type: "invoice"` | Emite una factura (sin billetera, con cliente y vencimiento) |
+| POST | `/movements` con `type: "collection"` | Registra un cobro contra una factura |
+| GET | `/receivables?status=&clientId=` | Facturas con saldo, estado y días de atraso |
+| GET | `/receivables/summary` | Totales por moneda, total ARS y tramos de antigüedad |
 | GET | `/reports/balance-by-wallet` | Saldos por billetera |
 | GET | `/exchange-rates?currency=USD&date=YYYY-MM-DD` | Cotización real (oficial/blue/mep/cripto) con caché y fallback |
 | GET | `/categories?kind=EXPENSE\|INCOME` | Categorías de gasto y rubros de ingreso |
@@ -88,6 +92,8 @@ npx expo start
 | GET | `/reports/by-category?month=YYYY-MM&type=expense` | Totales por categoría en ARS |
 | DELETE | `/wallets/:id` | 400 si la billetera tiene movimientos |
 | DELETE | `/clients/:id` | 400 si el cliente tiene movimientos |
+
+`LedgerEntry.changeArs` es el valor del asiento en ARS (con el snapshot del movimiento): es lo que permite balancear un cobro en otra moneda. Borrar una factura con cobros está bloqueado (400); hay que borrar primero los cobros.
 
 ## Integraciones
 
