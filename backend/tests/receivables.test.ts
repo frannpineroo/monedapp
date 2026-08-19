@@ -199,3 +199,101 @@ describe('POST /movements type invoice', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('POST /movements type collection', () => {
+  async function issueInvoice(token: string, clientId: string, amount = 1000, currency = 'USD') {
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId,
+        amount,
+        currency,
+        dueDate: '2026-09-14',
+        description: 'Sprint 12',
+      })
+    return res.body as { id: string }
+  }
+
+  it('un cobro acredita la billetera y baja el saldo', async () => {
+    const { token, client, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const invoice = await issueInvoice(token, client.id, 1000, 'USD')
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.id, walletId: usd.id, amount: 400 })
+
+    expect(res.status).toBe(201)
+
+    const balances = await request(app).get('/reports/balance-by-wallet').set(auth(token))
+    const usdBalance = (balances.body as { wallet: { id: string }; balance: string }[]).find(
+      (b) => b.wallet.id === usd.id
+    )!
+    expect(Number(usdBalance.balance)).toBe(400)
+
+    const entries = await prisma.ledgerEntry.findMany({ where: { movementId: res.body.id } })
+    expect(entries.reduce((sum, e) => sum + Number(e.changeArs), 0)).toBe(0)
+  })
+
+  it('un cobro que excede el saldo → 400', async () => {
+    const { token, client, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const invoice = await issueInvoice(token, client.id, 1000, 'USD')
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.id, walletId: usd.id, amount: 1500 })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('El cobro supera el saldo pendiente')
+  })
+
+  it('factura USD cobrada en ARS deja una pata en Diferencia de cambio y suma 0 en ARS', async () => {
+    const { token, client, wallets } = await setupUser()
+    const ars = wallets.find((w) => w.currency === 'ARS')!
+    const invoice = await issueInvoice(token, client.id, 1000, 'USD')
+    const invoiceRow = await prisma.movement.findUniqueOrThrow({ where: { id: invoice.id } })
+    const invoiceRate = await prisma.exchangeRate.findUniqueOrThrow({
+      where: { id: invoiceRow.exchangeRateId },
+    })
+
+    // Cobrar en ARS un poco menos de lo facturado: la diferencia es pérdida de cambio.
+    const cobrado = Math.round(Number(invoiceRate.value) * 1000 * 0.95)
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.id, walletId: ars.id, amount: cobrado })
+
+    expect(res.status).toBe(201)
+
+    const entries = await prisma.ledgerEntry.findMany({ where: { movementId: res.body.id } })
+    expect(entries).toHaveLength(3)
+    expect(entries.reduce((sum, e) => sum + Number(e.changeArs), 0)).toBe(0)
+
+    const accounts = await prisma.account.findMany({
+      where: { id: { in: entries.map((e) => e.accountId) } },
+    })
+    expect(accounts.map((a) => a.name)).toContain('Diferencia de cambio')
+  })
+
+  it('cobro sin billetera o sin factura → 400', async () => {
+    const { token, client, wallets } = await setupUser()
+    const invoice = await issueInvoice(token, client.id)
+
+    const sinWallet = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.id, amount: 100 })
+    const sinInvoice = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', walletId: wallets[0].id, amount: 100 })
+
+    expect(sinWallet.status).toBe(400)
+    expect(sinInvoice.status).toBe(400)
+  })
+})

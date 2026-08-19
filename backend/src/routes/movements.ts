@@ -6,7 +6,7 @@ import { AppError } from '../lib/errors'
 import { serializeMovement } from '../lib/serializers'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { paramId } from '../lib/params'
-import { createInvoiceLedger, createLedgerForMovement } from '../services/ledgerService'
+import { createCollectionLedger, createInvoiceLedger, createLedgerForMovement } from '../services/ledgerService'
 import {
   defaultTypeForCurrency,
   parseExchangeRateType,
@@ -122,6 +122,62 @@ async function createInvoiceMovement(req: Request, res: Response, userId: string
   res.status(201).json(serializeMovement(movement))
 }
 
+async function createCollectionMovement(req: Request, res: Response, userId: string) {
+  const { invoiceId, walletId, amount, description, date } = req.body as Record<string, unknown>
+
+  if (typeof invoiceId !== 'string') throw new AppError(400, 'invoiceId es requerido en un cobro')
+  if (typeof walletId !== 'string') throw new AppError(400, 'walletId es requerido en un cobro')
+  const amountNum = Number(amount)
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    throw new AppError(400, 'amount debe ser un número mayor a 0')
+  }
+
+  const invoice = await prisma.movement.findFirst({
+    where: { id: invoiceId, userId, type: MovementType.invoice },
+  })
+  if (!invoice) throw new AppError(404, 'Factura no encontrada')
+
+  const wallet = await prisma.wallet.findFirst({ where: { id: walletId, userId } })
+  if (!wallet) throw new AppError(404, 'Billetera no encontrada')
+
+  const movementDate = parseDate(date ?? new Date().toISOString())
+  const exchangeRateId = await resolveExchangeRateId(wallet.currency, movementDate)
+
+  const movement = await prisma.$transaction(async (tx) => {
+    const created = await tx.movement.create({
+      data: {
+        userId,
+        walletId: wallet.id,
+        clientId: invoice.clientId,
+        invoiceId: invoice.id,
+        type: MovementType.collection,
+        amount: new Prisma.Decimal(amountNum),
+        currency: wallet.currency,
+        exchangeRateId,
+        description:
+          typeof description === 'string' && description.trim() !== ''
+            ? description.trim()
+            : `Cobro ${invoice.description}`,
+        date: movementDate,
+      },
+    })
+
+    await createCollectionLedger(tx, {
+      userId,
+      movementId: created.id,
+      invoice,
+      walletAccountId: wallet.accountId,
+      amount: created.amount,
+      currency: created.currency,
+      exchangeRateId,
+    })
+
+    return tx.movement.findUniqueOrThrow({ where: { id: created.id }, include: movementInclude })
+  })
+
+  res.status(201).json(serializeMovement(movement))
+}
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {
@@ -173,6 +229,10 @@ router.post(
     const movementType = parseMovementType(type)
     if (movementType === MovementType.invoice) {
       await createInvoiceMovement(req, res, userId)
+      return
+    }
+    if (movementType === MovementType.collection) {
+      await createCollectionMovement(req, res, userId)
       return
     }
 

@@ -174,3 +174,95 @@ export async function createInvoiceLedger(
     { accountId: incomeAccountId, change: -amount, currency: params.currency, changeArs: -ars },
   ])
 }
+
+/**
+ * El saldo pendiente sale del ledger, no de una columna: cada cobro deja una pata
+ * negativa sobre Deudores en la moneda de la factura.
+ */
+export async function outstandingForInvoice(
+  tx: Tx,
+  invoice: { id: string; userId: string; amount: Prisma.Decimal }
+): Promise<number> {
+  const { receivablesAccountId } = await ensureSystemAccounts(invoice.userId)
+
+  const applied = await tx.ledgerEntry.aggregate({
+    where: {
+      accountId: receivablesAccountId,
+      movement: { invoiceId: invoice.id },
+    },
+    _sum: { change: true },
+  })
+
+  return round2(Number(invoice.amount) + Number(applied._sum.change ?? 0))
+}
+
+export async function createCollectionLedger(
+  tx: Tx,
+  params: {
+    userId: string
+    movementId: string
+    invoice: { id: string; userId: string; amount: Prisma.Decimal; currency: Currency; exchangeRateId: string }
+    walletAccountId: string
+    amount: Prisma.Decimal
+    currency: Currency
+    exchangeRateId: string
+  }
+) {
+  const collected = Number(params.amount)
+  if (!(collected > 0)) throw new AppError(400, 'El monto debe ser mayor a 0')
+
+  const { receivablesAccountId, fxDifferenceAccountId } = await ensureSystemAccounts(params.userId)
+
+  const collectionRate = await tx.exchangeRate.findUniqueOrThrow({
+    where: { id: params.exchangeRateId },
+  })
+  const invoiceRate = await tx.exchangeRate.findUniqueOrThrow({
+    where: { id: params.invoice.exchangeRateId },
+  })
+
+  const collectedArs = round2(collected * Number(collectionRate.value))
+  // Cuánto de la deuda cancela, en la moneda de la factura, usando ambos snapshots.
+  const appliedRaw =
+    params.currency === params.invoice.currency
+      ? collected
+      : collectedArs / Number(invoiceRate.value)
+
+  const outstanding = await outstandingForInvoice(tx, params.invoice)
+  const applied = round2(Math.min(appliedRaw, outstanding))
+
+  if (round2(appliedRaw) > round2(outstanding + 0.01)) {
+    throw new AppError(400, 'El cobro supera el saldo pendiente')
+  }
+
+  const appliedArs = round2(applied * Number(invoiceRate.value))
+  const fxDifference = round2(appliedArs - collectedArs)
+
+  const entries: LedgerEntryInput[] = [
+    {
+      accountId: params.walletAccountId,
+      change: collected,
+      currency: params.currency,
+      changeArs: collectedArs,
+    },
+    {
+      accountId: receivablesAccountId,
+      change: -applied,
+      currency: params.invoice.currency,
+      changeArs: -appliedArs,
+    },
+  ]
+
+  if (fxDifference !== 0 || params.currency !== params.invoice.currency) {
+    entries.push({
+      accountId: fxDifferenceAccountId,
+      change: fxDifference,
+      currency: Currency.ARS,
+      changeArs: fxDifference,
+    })
+  }
+
+  // Único asiento del sistema con patas en monedas distintas: balancea solo en ARS.
+  await writeEntries(tx, params.movementId, entries, {
+    allowsMultiCurrency: params.currency !== params.invoice.currency,
+  })
+}
