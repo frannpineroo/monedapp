@@ -1,5 +1,5 @@
 import { apiRequest, ApiError } from '@/src/api/client'
-import type { Client, Movement } from '@/src/api/types'
+import type { Client, Movement, Receivable, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount } from '@/src/lib/format'
 import { colors } from '@/src/theme'
@@ -18,11 +18,28 @@ export default function MovementDetailScreen() {
   const [description, setDescription] = useState('')
   const [clientId, setClientId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [collectWalletId, setCollectWalletId] = useState<string | null>(null)
+  const [collectAmount, setCollectAmount] = useState('')
 
   const movement = useQuery({
     queryKey: ['movement', id],
     queryFn: () => apiRequest<Movement>(`/movements/${id}`, { token: accessToken }),
     enabled: !!accessToken && !!id,
+  })
+
+  const receivable = useQuery({
+    queryKey: ['receivables', 'detail', id],
+    queryFn: async () => {
+      const rows = await apiRequest<Receivable[]>('/receivables', { token: accessToken })
+      return rows.find((row) => row.id === id) ?? null
+    },
+    enabled: !!accessToken && movement.data?.type === 'invoice',
+  })
+
+  const wallets = useQuery({
+    queryKey: ['wallets'],
+    queryFn: () => apiRequest<Wallet[]>('/wallets', { token: accessToken }),
+    enabled: !!accessToken && movement.data?.type === 'invoice',
   })
 
   const clients = useQuery({
@@ -38,6 +55,13 @@ export default function MovementDetailScreen() {
     }
   }, [movement.data])
 
+  // El monto arranca precargado con el saldo: cobrar todo es el caso común.
+  useEffect(() => {
+    if (receivable.data && collectAmount === '') {
+      setCollectAmount(String(receivable.data.outstanding))
+    }
+  }, [receivable.data, collectAmount])
+
   const confirm = useMutation({
     mutationFn: () =>
       apiRequest<Movement>(`/movements/${id}`, {
@@ -51,6 +75,29 @@ export default function MovementDetailScreen() {
       router.back()
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo guardar'),
+  })
+
+  const collect = useMutation({
+    mutationFn: () =>
+      apiRequest('/movements', {
+        method: 'POST',
+        token: accessToken,
+        body: {
+          type: 'collection',
+          invoiceId: id,
+          walletId: collectWalletId,
+          amount: Number(collectAmount),
+          date: new Date().toISOString().slice(0, 10),
+        },
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] })
+      await queryClient.invalidateQueries({ queryKey: ['receivables-summary'] })
+      await queryClient.invalidateQueries({ queryKey: ['movements'] })
+      await queryClient.invalidateQueries({ queryKey: ['balance-by-wallet'] })
+      setCollectAmount('')
+    },
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo registrar el cobro'),
   })
 
   if (movement.isLoading || !movement.data) {
@@ -104,6 +151,76 @@ export default function MovementDetailScreen() {
               </Pressable>
             ))}
           </View>
+        </>
+      ) : null}
+
+      {movement.data.type === 'invoice' && receivable.data ? (
+        <>
+          <Text style={formStyles.label}>
+            Saldo pendiente: {formatAmount(receivable.data.outstanding, receivable.data.currency)}
+          </Text>
+
+          {receivable.data.collections.length > 0 ? (
+            <View style={{ gap: 4 }}>
+              {receivable.data.collections.map((c) => (
+                <Text key={c.id} style={styles.meta}>
+                  {new Date(c.date).toLocaleDateString('es-AR')} ·{' '}
+                  {formatAmount(c.amount, c.currency)}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
+          {receivable.data.status !== 'paid' ? (
+            <>
+              <Text style={formStyles.label}>Cobrar en</Text>
+              <View style={formStyles.rowWrap}>
+                {(wallets.data ?? []).map((w) => (
+                  <Pressable
+                    key={w.id}
+                    style={[formStyles.chip, collectWalletId === w.id && formStyles.chipActive]}
+                    onPress={() => setCollectWalletId(w.id)}
+                  >
+                    <Text
+                      style={[
+                        formStyles.chipText,
+                        collectWalletId === w.id && formStyles.chipTextActive,
+                      ]}
+                    >
+                      {w.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <TextInput
+                style={formStyles.input}
+                keyboardType="decimal-pad"
+                value={collectAmount}
+                onChangeText={setCollectAmount}
+                placeholderTextColor={colors.muted}
+              />
+
+              <Pressable
+                style={formStyles.button}
+                onPress={() => {
+                  setError(null)
+                  if (!collectWalletId) {
+                    setError('Elegí la billetera del cobro')
+                    return
+                  }
+                  collect.mutate()
+                }}
+                disabled={collect.isPending}
+              >
+                {collect.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={formStyles.buttonText}>Registrar cobro</Text>
+                )}
+              </Pressable>
+            </>
+          ) : null}
         </>
       ) : null}
 
