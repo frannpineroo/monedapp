@@ -1,20 +1,24 @@
 import { apiRequest } from '@/src/api/client'
 import type { Movement, ReceivablesSummary, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { formatAmount, groupBalancesByCurrency } from '@/src/lib/format'
-import { colors } from '@/src/theme'
+import { groupBalancesByCurrency } from '@/src/lib/format'
+import { colors, radius, spacing } from '@/src/theme'
+import {
+  Button,
+  Card,
+  EmptyState,
+  LedgerCell,
+  LinkButton,
+  ListRow,
+  Money,
+  Screen,
+  Section,
+  Txt,
+} from '@/src/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useCallback, useMemo } from 'react'
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 
 const typeLabel: Record<Movement['type'], string> = {
   income: 'Ingreso',
@@ -24,14 +28,20 @@ const typeLabel: Record<Movement['type'], string> = {
   collection: 'Cobro',
 }
 
+/** Los gastos se guardan en positivo: el signo lo pone la vista. */
+function signFor(type: Movement['type']) {
+  if (type === 'expense') return '-' as const
+  if (type === 'income' || type === 'collection') return '+' as const
+  return undefined
+}
+
 export default function HomeScreen() {
   const { accessToken, user } = useAuth()
   const router = useRouter()
 
   const balances = useQuery({
     queryKey: ['balance-by-wallet'],
-    queryFn: () =>
-      apiRequest<WalletBalance[]>('/reports/balance-by-wallet', { token: accessToken }),
+    queryFn: () => apiRequest<WalletBalance[]>('/reports/balance-by-wallet', { token: accessToken }),
     enabled: !!accessToken,
   })
 
@@ -43,16 +53,14 @@ export default function HomeScreen() {
 
   const pending = useQuery({
     queryKey: ['movements', { needsReview: true }],
-    queryFn: () =>
-      apiRequest<Movement[]>('/movements?needsReview=true', { token: accessToken }),
+    queryFn: () => apiRequest<Movement[]>('/movements?needsReview=true', { token: accessToken }),
     enabled: !!accessToken,
   })
   const pendingCount = pending.data?.length ?? 0
 
   const receivables = useQuery({
     queryKey: ['receivables-summary'],
-    queryFn: () =>
-      apiRequest<ReceivablesSummary>('/receivables/summary', { token: accessToken }),
+    queryFn: () => apiRequest<ReceivablesSummary>('/receivables/summary', { token: accessToken }),
     enabled: !!accessToken,
   })
 
@@ -74,8 +82,14 @@ export default function HomeScreen() {
     () => groupBalancesByCurrency(balances.data ?? []),
     [balances.data]
   )
-  const currencyEntries = Object.entries(totalsByCurrency)
+  /** La moneda con más saldo encabeza el balance; el resto va debajo. */
+  const currencyEntries = useMemo(
+    () => Object.entries(totalsByCurrency).sort((a, b) => Number(b[1]) - Number(a[1])),
+    [totalsByCurrency]
+  )
+  const [leadCurrency, ...restCurrencies] = currencyEntries
   const recentMovements = (movements.data ?? []).slice(0, 5)
+  const wallets = balances.data ?? []
 
   const refreshing =
     balances.isFetching ||
@@ -83,6 +97,7 @@ export default function HomeScreen() {
     byCategory.isFetching ||
     pending.isFetching ||
     receivables.isFetching
+
   const onRefresh = useCallback(() => {
     void balances.refetch()
     void movements.refetch()
@@ -94,322 +109,258 @@ export default function HomeScreen() {
   const loading = balances.isLoading || movements.isLoading
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    <Screen
+      scroll
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.muted}
+          colors={[colors.brand]}
+          progressBackgroundColor={colors.surface}
+        />
+      }
     >
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.hello}>Hola</Text>
-          <Text style={styles.email}>{user?.email}</Text>
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Txt variant="title">Hola</Txt>
+          <Txt variant="caption" tone="faint" numberOfLines={1}>
+            {user?.email}
+          </Txt>
         </View>
-        <Pressable onPress={() => router.push('/integrations')}>
-          <Text style={styles.seeAll}>Integraciones</Text>
-        </Pressable>
+        <LinkButton label="Integraciones" onPress={() => router.push('/integrations')} />
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+        <ActivityIndicator color={colors.brand} style={styles.loader} />
       ) : (
         <>
           {pendingCount > 0 ? (
-            <Pressable style={styles.banner} onPress={() => router.push('/(tabs)/inbox')}>
-              <Text style={styles.bannerText}>
-                Tenés {pendingCount} movimiento{pendingCount === 1 ? '' : 's'} para revisar
-              </Text>
-            </Pressable>
+            <Card attention onPress={() => router.push('/(tabs)/inbox')} style={styles.banner}>
+              <Txt variant="bodyMedium">
+                {pendingCount} movimiento{pendingCount === 1 ? '' : 's'} para revisar
+              </Txt>
+              <Txt variant="caption" tone="faint" style={styles.bannerHint}>
+                Confirmá el tipo y la categoría para que entren al balance.
+              </Txt>
+            </Card>
           ) : null}
 
-          <Text style={styles.sectionLabel}>Tu plata</Text>
-          <View style={styles.hero}>
+          <Section title="Tu plata">
             {currencyEntries.length === 0 ? (
-              <Text style={styles.empty}>Todavía no tenés billeteras.</Text>
+              <EmptyState
+                title="Todavía no tenés billeteras"
+                body="Agregá una billetera para empezar a llevar el balance."
+                actionLabel="Agregar billetera"
+                onAction={() => router.push('/wallets')}
+              />
             ) : (
-              currencyEntries.map(([currency, total]) => (
-                <View key={currency} style={styles.totalRow}>
-                  <Text style={styles.totalCurrency}>{currency}</Text>
-                  <Text style={styles.totalAmount}>
-                    {Number(total).toLocaleString('es-AR', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Text>
-                </View>
-              ))
+              <Card>
+                <Txt variant="label" tone="faint">
+                  {leadCurrency[0]}
+                </Txt>
+                <Money value={leadCurrency[1]} variant="display" />
+                {restCurrencies.length > 0 ? (
+                  <View style={styles.restCurrencies}>
+                    {restCurrencies.map(([currency, total]) => (
+                      <View key={currency} style={styles.currencyRow}>
+                        <Txt variant="label" tone="faint">
+                          {currency}
+                        </Txt>
+                        <Money value={total} />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </Card>
             )}
-          </View>
+          </Section>
 
           {receivables.data && receivables.data.totalArs > 0 ? (
-            <Pressable style={styles.owedCard} onPress={() => router.push('/receivables')}>
-              <Text style={styles.sectionLabelInline}>Te deben</Text>
-              <Text style={styles.owedTotal}>{formatAmount(receivables.data.totalArs, 'ARS')}</Text>
-              {receivables.data.overdueArs > 0 ? (
-                <Text style={styles.owedOverdue}>
-                  {formatAmount(receivables.data.overdueArs, 'ARS')} vencido
-                </Text>
-              ) : null}
-            </Pressable>
+            <Section
+              title="Te deben"
+              action={<LinkButton label="Ver detalle" onPress={() => router.push('/receivables')} />}
+            >
+              <Card onPress={() => router.push('/receivables')}>
+                <Txt variant="label" tone="faint">
+                  ARS
+                </Txt>
+                <Money value={receivables.data.totalArs} variant="amountLarge" />
+                {receivables.data.overdueArs > 0 ? (
+                  <View style={styles.owedOverdue}>
+                    <Txt variant="captionStrong" tone="attention">
+                      Vencido
+                    </Txt>
+                    <Money value={receivables.data.overdueArs} tone="attention" />
+                  </View>
+                ) : null}
+              </Card>
+            </Section>
           ) : null}
 
-          <Text style={styles.sectionLabel}>Tus billeteras</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.walletRow}
-          >
-            {(balances.data ?? []).length === 0 ? (
-              <Text style={styles.empty}>Agregá una billetera para empezar.</Text>
-            ) : (
-              (balances.data ?? []).map((item) => (
-                <View key={item.wallet.id} style={styles.walletCard}>
-                  <Text style={styles.walletName} numberOfLines={1}>
-                    {item.wallet.name}
-                  </Text>
-                  <Text style={styles.walletCurrency}>{item.currency}</Text>
-                  <Text style={styles.walletBalance}>
-                    {formatAmount(item.balance, item.currency)}
-                  </Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-
-          {topCategories.length > 0 ? (
-            <>
-              <Text style={styles.sectionLabel}>En qué se te fue</Text>
-              <View style={styles.categoryCard}>
-                {topCategories.map((row) => (
-                  <View key={row.categoryId ?? row.name} style={styles.categoryRow}>
-                    <View style={styles.categoryHeader}>
-                      <Text style={styles.categoryName} numberOfLines={1}>
-                        {row.name}
-                      </Text>
-                      <Text style={styles.categoryTotal}>{formatAmount(row.total, 'ARS')}</Text>
-                    </View>
-                    <View style={styles.barTrack}>
-                      <View style={[styles.barFill, { width: `${Math.max(row.percent, 2)}%` }]} />
+          {wallets.length > 0 ? (
+            <Section
+              title="Tus billeteras"
+              action={<LinkButton label="Administrar" onPress={() => router.push('/wallets')} />}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.walletRow}
+              >
+                {wallets.map((item) => (
+                  <View key={item.wallet.id} style={styles.walletCard}>
+                    <Txt variant="captionStrong" tone="muted" numberOfLines={1}>
+                      {item.wallet.name}
+                    </Txt>
+                    <View style={styles.walletAmount}>
+                      <Money value={item.balance} />
+                      <Txt variant="label" tone="faint" align="right">
+                        {item.currency}
+                      </Txt>
                     </View>
                   </View>
                 ))}
-              </View>
-            </>
+              </ScrollView>
+            </Section>
           ) : null}
 
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabelInline}>Últimos movimientos</Text>
-            <Pressable onPress={() => router.push('/(tabs)/movements')}>
-              <Text style={styles.seeAll}>Ver todos</Text>
-            </Pressable>
-          </View>
-
-          {recentMovements.length === 0 ? (
-            <Text style={styles.empty}>Todavía no hay movimientos.</Text>
-          ) : (
-            <View style={styles.movementsList}>
-              {recentMovements.map((item) => {
-                const amount = Number(item.amount)
-                const sign = item.type === 'expense' ? '-' : '+'
-                const color =
-                  item.type === 'expense'
-                    ? colors.expense
-                    : item.type === 'income'
-                      ? colors.income
-                      : colors.ink
-                return (
-                  <View key={item.id} style={styles.movementRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.movementDesc}>{item.description}</Text>
-                      <Text style={styles.movementMeta}>
-                        {typeLabel[item.type]} · {item.wallet?.name ?? item.currency}
-                      </Text>
+          {topCategories.length > 0 ? (
+            <Section title="En qué se te fue este mes">
+              <Card>
+                <View style={styles.categoryList}>
+                  {topCategories.map((row, index) => (
+                    <View key={row.categoryId ?? row.name} style={styles.categoryRow}>
+                      <View style={styles.categoryHeader}>
+                        <Txt variant="captionStrong" numberOfLines={1} style={styles.categoryName}>
+                          {row.name}
+                        </Txt>
+                        <Money value={row.total} />
+                      </View>
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            index === 0 ? styles.barFillLead : null,
+                            { width: `${Math.min(Math.max(row.percent, 2), 100)}%` },
+                          ]}
+                        />
+                      </View>
                     </View>
-                    <Text style={[styles.movementAmount, { color }]}>
-                      {sign}
-                      {formatAmount(amount, item.currency)}
-                    </Text>
-                  </View>
-                )
-              })}
-            </View>
-          )}
+                  ))}
+                </View>
+              </Card>
+            </Section>
+          ) : null}
+
+          <Section
+            title="Últimos movimientos"
+            action={<LinkButton label="Ver todos" onPress={() => router.push('/(tabs)/movements')} />}
+          >
+            {recentMovements.length === 0 ? (
+              <EmptyState
+                title="Sin movimientos todavía"
+                body="Cargá el primero y aparece acá."
+                actionLabel="Cargar movimiento"
+                onAction={() => router.push('/(tabs)/new-movement')}
+              />
+            ) : (
+              <View style={styles.movements}>
+                {recentMovements.map((item) => (
+                  <ListRow
+                    key={item.id}
+                    title={item.description}
+                    meta={`${typeLabel[item.type]} · ${item.wallet?.name ?? item.currency}`}
+                    onPress={() => router.push(`/movement/${item.id}`)}
+                    attention={item.needsReview}
+                    right={
+                      <LedgerCell
+                        value={item.amount}
+                        currency={item.currency}
+                        sign={signFor(item.type)}
+                        tone={item.type === 'income' || item.type === 'collection' ? 'positive' : 'ink'}
+                      />
+                    }
+                  />
+                ))}
+              </View>
+            )}
+          </Section>
+
+          <Button
+            label="Cargar movimiento"
+            block
+            size="lg"
+            onPress={() => router.push('/(tabs)/new-movement')}
+          />
         </>
       )}
-    </ScrollView>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  headerRow: {
+  header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  hello: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  email: {
-    color: colors.muted,
-    marginTop: 2,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.muted,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  sectionLabelInline: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-    marginTop: 8,
-  },
-  seeAll: {
-    color: colors.accent,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  banner: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-  },
-  bannerText: { color: colors.accent, fontWeight: '600' },
-  hero: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 24,
-    gap: 12,
-  },
-  totalRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: spacing.lg,
+    marginBottom: spacing.xxl,
+  },
+  headerText: { flex: 1, gap: 2 },
+  loader: { marginTop: spacing.huge },
+  banner: { marginBottom: spacing.xxl },
+  bannerHint: { marginTop: spacing.xs },
+  restCurrencies: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
+  },
+  currencyRow: {
+    flexDirection: 'row',
     alignItems: 'baseline',
+    justifyContent: 'space-between',
   },
-  totalCurrency: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.muted,
-  },
-  totalAmount: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  walletRow: {
-    gap: 12,
-    paddingBottom: 4,
-    marginBottom: 24,
-  },
-  walletCard: {
-    width: 140,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  walletName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.ink,
-  },
-  walletCurrency: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  walletBalance: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.accent,
-    marginTop: 10,
-  },
-  movementsList: {
-    gap: 10,
-  },
-  movementRow: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
+  owedOverdue: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
-  movementDesc: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.ink,
-  },
-  movementMeta: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  movementAmount: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  empty: {
-    color: colors.muted,
-    marginBottom: 16,
-  },
-  categoryCard: {
+  walletRow: { gap: spacing.md, paddingRight: spacing.xs },
+  walletCard: {
+    width: 152,
+    minHeight: 104,
+    justifyContent: 'space-between',
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    padding: 16,
-    gap: 12,
-    marginBottom: 24,
+    padding: spacing.lg,
   },
-  categoryRow: { gap: 6 },
-  categoryHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  categoryName: { flex: 1, fontSize: 14, color: colors.ink },
-  categoryTotal: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  walletAmount: { marginTop: spacing.lg },
+  categoryList: { gap: spacing.lg },
+  categoryRow: { gap: spacing.sm },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  categoryName: { flex: 1 },
   barTrack: {
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: colors.accentSoft,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceRaised,
     overflow: 'hidden',
   },
-  barFill: { height: 8, borderRadius: 999, backgroundColor: colors.accent },
-  owedCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    marginBottom: 24,
-    gap: 6,
-  },
-  owedTotal: { fontSize: 24, fontWeight: '700', color: colors.ink },
-  owedOverdue: { color: colors.danger, fontWeight: '600' },
+  barFill: { height: 4, borderRadius: radius.pill, backgroundColor: colors.borderStrong },
+  // La categoría que más se llevó se marca por jerarquía, no por color.
+  barFillLead: { backgroundColor: colors.ink },
+  movements: { gap: spacing.sm },
 })

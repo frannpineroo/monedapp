@@ -1,22 +1,12 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { Client } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors } from '@/src/theme'
-import { formStyles } from '@/src/ui/formStyles'
+import { colors, spacing } from '@/src/theme'
+import { Button, Chip, ChipRow, EmptyState, Field, ListRow, Screen, Sheet, Txt } from '@/src/ui'
+import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
 
 export default function ClientsScreen() {
   const { accessToken } = useAuth()
@@ -58,11 +48,7 @@ export default function ClientsScreen() {
     mutationFn: () => {
       const body = { name: name.trim(), phone: phone.trim(), defaultCurrency: currency }
       return editing
-        ? apiRequest<Client>(`/clients/${editing.id}`, {
-            method: 'PATCH',
-            token: accessToken,
-            body,
-          })
+        ? apiRequest<Client>(`/clients/${editing.id}`, { method: 'PATCH', token: accessToken, body })
         : apiRequest<Client>('/clients', { method: 'POST', token: accessToken, body })
     },
     onSuccess: async () => {
@@ -106,133 +92,94 @@ export default function ClientsScreen() {
   })
 
   return (
-    <View style={styles.container}>
+    <Screen
+      edges={['bottom']}
+      footer={<Button label="Nuevo cliente" size="lg" block onPress={openCreate} />}
+    >
       {clients.isLoading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+        <ActivityIndicator color={colors.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={clients.data ?? []}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 32 }}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={clients.isFetching} onRefresh={() => clients.refetch()} />
+            <RefreshControl
+              refreshing={clients.isFetching}
+              onRefresh={() => clients.refetch()}
+              tintColor={colors.muted}
+              colors={[colors.brand]}
+              progressBackgroundColor={colors.surface}
+            />
           }
-          ListEmptyComponent={<Text style={styles.empty}>Todavía no tenés clientes.</Text>}
+          ListEmptyComponent={
+            <EmptyState
+              title="Todavía no tenés clientes"
+              body="Cargá a quién le facturás para seguir lo que te deben."
+              actionLabel="Nuevo cliente"
+              onAction={openCreate}
+            />
+          }
           renderItem={({ item }) => (
-            <Pressable style={styles.row} onPress={() => openEdit(item)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>
-                  {item.defaultCurrency}
-                  {item.phone ? ` · ${item.phone}` : ''}
-                </Text>
-              </View>
-            </Pressable>
+            <ListRow
+              title={item.name}
+              meta={`${item.defaultCurrency}${item.phone ? ` · ${item.phone}` : ''}`}
+              onPress={() => openEdit(item)}
+            />
           )}
         />
       )}
 
-      <View style={styles.footer}>
-        <Pressable style={formStyles.button} onPress={openCreate}>
-          <Text style={formStyles.buttonText}>Nuevo cliente</Text>
-        </Pressable>
-      </View>
+      <Sheet visible={open} title={editing ? 'Editar cliente' : 'Nuevo cliente'} onClose={close}>
+        <Field
+          label="Nombre"
+          placeholder="Ej. Estudio Contable"
+          value={name}
+          onChangeText={setName}
+          error={error ?? undefined}
+        />
+        <Field
+          label="Teléfono (opcional)"
+          keyboardType="phone-pad"
+          placeholder="+54 9 11 2233 4455"
+          value={phone}
+          onChangeText={setPhone}
+        />
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
-        <View style={styles.backdrop}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{editing ? 'Editar cliente' : 'Nuevo cliente'}</Text>
-
-            <Text style={formStyles.label}>Nombre</Text>
-            <TextInput
-              style={formStyles.input}
-              placeholder="Ej. Estudio Contable"
-              placeholderTextColor={colors.muted}
-              value={name}
-              onChangeText={setName}
-            />
-
-            <Text style={formStyles.label}>Teléfono (opcional)</Text>
-            <TextInput
-              style={formStyles.input}
-              keyboardType="phone-pad"
-              placeholder="+54 9 11 2233 4455"
-              placeholderTextColor={colors.muted}
-              value={phone}
-              onChangeText={setPhone}
-            />
-
-            <Text style={formStyles.label}>Moneda por defecto</Text>
-            <View style={formStyles.rowWrap}>
-              {['ARS', 'USD', 'USDT'].map((c) => (
-                <Pressable
-                  key={c}
-                  style={[formStyles.chip, currency === c && formStyles.chipActive]}
-                  onPress={() => setCurrency(c)}
-                >
-                  <Text
-                    style={[formStyles.chipText, currency === c && formStyles.chipTextActive]}
-                  >
-                    {c}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {error ? <Text style={formStyles.error}>{error}</Text> : null}
-
-            <Pressable style={formStyles.button} onPress={submit} disabled={save.isPending}>
-              {save.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={formStyles.buttonText}>Guardar</Text>
-              )}
-            </Pressable>
-            {editing ? (
-              <Pressable onPress={confirmRemove} disabled={remove.isPending}>
-                <Text style={styles.delete}>Borrar cliente</Text>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={close}>
-              <Text style={styles.cancel}>Cancelar</Text>
-            </Pressable>
-          </View>
+        <View style={styles.group}>
+          <Txt variant="label" tone="faint">
+            Moneda por defecto
+          </Txt>
+          <ChipRow>
+            {['ARS', 'USD', 'USDT'].map((c) => (
+              <Chip key={c} label={c} selected={currency === c} onPress={() => setCurrency(c)} />
+            ))}
+          </ChipRow>
         </View>
-      </Modal>
-    </View>
+
+        <Button label="Guardar" size="lg" block loading={save.isPending} onPress={submit} />
+        {editing ? (
+          <Button
+            label="Borrar cliente"
+            variant="destructive"
+            block
+            loading={remove.isPending}
+            onPress={confirmRemove}
+          />
+        ) : null}
+      </Sheet>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  row: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  loader: { marginTop: spacing.xxxl },
+  list: {
+    gap: spacing.sm,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
-  name: { fontSize: 16, fontWeight: '600', color: colors.ink },
-  meta: { fontSize: 13, color: colors.muted, marginTop: 4 },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
-  footer: {
-    padding: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    gap: 12,
-  },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  cancel: { color: colors.muted, textAlign: 'center', paddingVertical: 8 },
-  delete: { color: colors.danger, textAlign: 'center', paddingVertical: 8, fontWeight: '600' },
+  group: { gap: spacing.sm },
 })

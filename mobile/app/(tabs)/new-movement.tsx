@@ -1,22 +1,33 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Client, ExchangeRate, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { formatAmount } from '@/src/lib/format'
-import { colors } from '@/src/theme'
+import { colors, radius, spacing, type } from '@/src/theme'
+import { Button, Chip, ChipRow, Field, Screen, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { StyleSheet, TextInput, View } from 'react-native'
 
 type MovementType = 'income' | 'expense' | 'transfer' | 'invoice'
+
+const typeOptions: { id: MovementType; label: string }[] = [
+  { id: 'income', label: 'Ingreso' },
+  { id: 'expense', label: 'Gasto' },
+  { id: 'transfer', label: 'Transferencia' },
+  { id: 'invoice', label: 'Factura' },
+]
+
+/** Grupo de opciones: rótulo arriba, chips debajo. */
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.group}>
+      <Txt variant="label" tone="faint">
+        {label}
+      </Txt>
+      <ChipRow>{children}</ChipRow>
+    </View>
+  )
+}
 
 export default function NewMovementScreen() {
   const { accessToken } = useAuth()
@@ -51,8 +62,7 @@ export default function NewMovementScreen() {
 
   const categories = useQuery({
     queryKey: ['categories', categoryKind],
-    queryFn: () =>
-      apiRequest<Category[]>(`/categories?kind=${categoryKind}`, { token: accessToken }),
+    queryFn: () => apiRequest<Category[]>(`/categories?kind=${categoryKind}`, { token: accessToken }),
     enabled: !!accessToken && type !== 'transfer',
   })
 
@@ -81,16 +91,11 @@ export default function NewMovementScreen() {
   })
 
   // Si cambia la billetera, el tipo elegido puede no existir para la nueva moneda.
-  const activeRate =
-    (rates.data ?? []).find((r) => r.type === rateType) ?? rates.data?.[0] ?? null
+  const activeRate = (rates.data ?? []).find((r) => r.type === rateType) ?? rates.data?.[0] ?? null
 
   const createClient = useMutation({
     mutationFn: (name: string) =>
-      apiRequest<Client>('/clients', {
-        method: 'POST',
-        token: accessToken,
-        body: { name },
-      }),
+      apiRequest<Client>('/clients', { method: 'POST', token: accessToken, body: { name } }),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: ['clients'] })
       setClientId(created.id)
@@ -236,151 +241,151 @@ export default function NewMovementScreen() {
     createCategory.mutate(name)
   }
 
+  const converted =
+    activeRate && Number(amount) > 0
+      ? Number(amount) * Number(activeRate.sell ?? activeRate.value)
+      : null
+  const estimatedRate = activeRate?.source === 'db-fallback' || activeRate?.source === 'stub'
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, gap: 14 }}>
-      <Text style={styles.label}>Tipo</Text>
-      <View style={styles.rowWrap}>
-        {(['income', 'expense', 'transfer', 'invoice'] as MovementType[]).map((t) => (
-          <Pressable
-            key={t}
-            style={[styles.chip, type === t && styles.chipActive]}
-            onPress={() => selectType(t)}
-          >
-            <Text style={[styles.chipText, type === t && styles.chipTextActive]}>
-              {t === 'income'
-                ? 'Ingreso'
-                : t === 'expense'
-                  ? 'Gasto'
-                  : t === 'transfer'
-                    ? 'Transferencia'
-                    : 'Factura'}
-            </Text>
-          </Pressable>
+    <Screen
+      scroll
+      footer={
+        <Button
+          label="Guardar movimiento"
+          size="lg"
+          block
+          loading={create.isPending}
+          onPress={submit}
+        />
+      }
+    >
+      <Txt variant="title" style={styles.title}>
+        Nuevo movimiento
+      </Txt>
+
+      <ChipRow style={styles.typeRow}>
+        {typeOptions.map((opt) => (
+          <Chip
+            key={opt.id}
+            label={opt.label}
+            selected={type === opt.id}
+            onPress={() => selectType(opt.id)}
+          />
         ))}
+      </ChipRow>
+
+      {/* El monto encabeza la carga: primero el número, después el contexto. */}
+      <View style={styles.amountCard}>
+        <Txt variant="label" tone="faint">
+          {currency}
+        </Txt>
+        <TextInput
+          style={styles.amountInput}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          placeholderTextColor={colors.faint}
+          selectionColor={colors.brand}
+          value={amount}
+          onChangeText={setAmount}
+        />
+        {converted !== null ? (
+          <Txt variant="caption" tone="faint" align="right">
+            ≈ {converted.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS
+            {estimatedRate ? ' · cotización estimada' : ''}
+          </Txt>
+        ) : null}
       </View>
+
+      <Field
+        label="Descripción"
+        placeholder="Ej. Cobro cliente X"
+        value={description}
+        onChangeText={setDescription}
+        containerStyle={styles.field}
+      />
 
       {type === 'invoice' ? (
         <>
-          <Text style={styles.label}>Moneda</Text>
-          <View style={styles.rowWrap}>
+          <Group label="Moneda">
             {['ARS', 'USD', 'USDT'].map((c) => (
-              <Pressable
+              <Chip
                 key={c}
-                style={[styles.chip, invoiceCurrency === c && styles.chipActive]}
+                label={c}
+                selected={invoiceCurrency === c}
                 onPress={() => setInvoiceCurrency(c)}
-              >
-                <Text
-                  style={[styles.chipText, invoiceCurrency === c && styles.chipTextActive]}
-                >
-                  {c}
-                </Text>
-              </Pressable>
+              />
             ))}
-          </View>
-
-          <Text style={styles.label}>Vence el</Text>
-          <TextInput
-            style={styles.input}
+          </Group>
+          <Field
+            label="Vence el"
             placeholder="2026-09-14"
-            placeholderTextColor={colors.muted}
+            hint="Formato año-mes-día."
             value={dueDate}
             onChangeText={setDueDate}
+            containerStyle={styles.field}
           />
         </>
       ) : (
-        <>
-          <Text style={styles.label}>{type === 'transfer' ? 'Desde' : 'Billetera'}</Text>
-          <View style={styles.rowWrap}>
-            {(wallets.data ?? []).map((w) => (
-              <Pressable
-                key={w.id}
-                style={[styles.chip, selectedWalletId === w.id && styles.chipActive]}
-                onPress={() => setWalletId(w.id)}
-              >
-                <Text
-                  style={[styles.chipText, selectedWalletId === w.id && styles.chipTextActive]}
-                >
-                  {w.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
+        <Group label={type === 'transfer' ? 'Desde' : 'Billetera'}>
+          {(wallets.data ?? []).map((w) => (
+            <Chip
+              key={w.id}
+              label={w.name}
+              selected={selectedWalletId === w.id}
+              onPress={() => setWalletId(w.id)}
+            />
+          ))}
+        </Group>
       )}
 
       {type === 'transfer' ? (
-        <>
-          <Text style={styles.label}>Hacia</Text>
-          <View style={styles.rowWrap}>
-            {otherWallets.map((w) => (
-              <Pressable
-                key={w.id}
-                style={[styles.chip, toWalletId === w.id && styles.chipActive]}
-                onPress={() => setToWalletId(w.id)}
-              >
-                <Text style={[styles.chipText, toWalletId === w.id && styles.chipTextActive]}>
-                  {w.name}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
+        <Group label="Hacia">
+          {otherWallets.map((w) => (
+            <Chip
+              key={w.id}
+              label={w.name}
+              selected={toWalletId === w.id}
+              onPress={() => setToWalletId(w.id)}
+            />
+          ))}
+        </Group>
       ) : null}
 
       {type === 'income' || type === 'invoice' ? (
         <>
-          <Text style={styles.label}>{type === 'invoice' ? 'Cliente' : 'Cliente (opcional)'}</Text>
-          <View style={styles.rowWrap}>
+          <Group label={type === 'invoice' ? 'Cliente' : 'Cliente (opcional)'}>
             {type === 'income' ? (
-              <Pressable
-                style={[styles.chip, clientId === null && styles.chipActive]}
-                onPress={() => setClientId(null)}
-              >
-                <Text style={[styles.chipText, clientId === null && styles.chipTextActive]}>
-                  Sin cliente
-                </Text>
-              </Pressable>
+              <Chip label="Sin cliente" selected={clientId === null} onPress={() => setClientId(null)} />
             ) : null}
             {(clients.data ?? []).map((c) => (
-              <Pressable
+              <Chip
                 key={c.id}
-                style={[styles.chip, clientId === c.id && styles.chipActive]}
+                label={c.name}
+                selected={clientId === c.id}
                 onPress={() => setClientId(c.id)}
-              >
-                <Text style={[styles.chipText, clientId === c.id && styles.chipTextActive]}>
-                  {c.name}
-                </Text>
-              </Pressable>
+              />
             ))}
-            <Pressable
-              style={[styles.chip, showNewClient && styles.chipActive]}
+            <Chip
+              label="Nuevo cliente"
+              selected={showNewClient}
               onPress={() => setShowNewClient((v) => !v)}
-            >
-              <Text style={[styles.chipText, showNewClient && styles.chipTextActive]}>
-                Nuevo cliente
-              </Text>
-            </Pressable>
-          </View>
+            />
+          </Group>
           {showNewClient ? (
-            <View style={styles.newClientRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
+            <View style={styles.inlineCreate}>
+              <Field
                 placeholder="Nombre del cliente"
-                placeholderTextColor={colors.muted}
                 value={newClientName}
                 onChangeText={setNewClientName}
+                containerStyle={styles.inlineField}
               />
-              <Pressable
-                style={styles.smallButton}
+              <Button
+                label="Agregar"
+                variant="secondary"
+                loading={createClient.isPending}
                 onPress={submitNewClient}
-                disabled={createClient.isPending}
-              >
-                {createClient.isPending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Agregar</Text>
-                )}
-              </Pressable>
+              />
             </View>
           ) : null}
         </>
@@ -388,195 +393,99 @@ export default function NewMovementScreen() {
 
       {type !== 'transfer' ? (
         <>
-          <Text style={styles.label}>Categoría</Text>
-          <View style={styles.rowWrap}>
+          <Group label="Categoría">
             {(categories.data ?? []).map((c) => (
-              <Pressable
+              <Chip
                 key={c.id}
-                style={[styles.chip, categoryId === c.id && styles.chipActive]}
+                label={c.name}
+                selected={categoryId === c.id}
                 onPress={() => setCategoryId(c.id)}
-              >
-                <Text style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>
-                  {c.name}
-                </Text>
-              </Pressable>
+              />
             ))}
-            <Pressable
-              style={[styles.chip, showNewCategory && styles.chipActive]}
+            <Chip
+              label="Nueva categoría"
+              selected={showNewCategory}
               onPress={() => setShowNewCategory((v) => !v)}
-            >
-              <Text style={[styles.chipText, showNewCategory && styles.chipTextActive]}>
-                Nueva categoría
-              </Text>
-            </Pressable>
-          </View>
+            />
+          </Group>
           {showNewCategory ? (
-            <View style={styles.newClientRow}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
+            <View style={styles.inlineCreate}>
+              <Field
                 placeholder="Nombre de la categoría"
-                placeholderTextColor={colors.muted}
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
+                containerStyle={styles.inlineField}
               />
-              <Pressable
-                style={styles.smallButton}
+              <Button
+                label="Agregar"
+                variant="secondary"
+                loading={createCategory.isPending}
                 onPress={submitNewCategory}
-                disabled={createCategory.isPending}
-              >
-                {createCategory.isPending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Agregar</Text>
-                )}
-              </Pressable>
+              />
             </View>
           ) : null}
         </>
       ) : null}
 
-      <Text style={styles.label}>Monto</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="decimal-pad"
-        placeholder="0"
-        placeholderTextColor={colors.muted}
-        value={amount}
-        onChangeText={setAmount}
-      />
-
       {currency !== 'ARS' && (rates.data ?? []).length > 0 ? (
-        <>
-          <Text style={styles.label}>Cotización</Text>
-          <View style={styles.rowWrap}>
-            {(rates.data ?? []).map((r) => (
-              <Pressable
-                key={r.id}
-                style={[styles.chip, activeRate?.id === r.id && styles.chipActive]}
-                onPress={() => setRateType(r.type)}
-              >
-                <Text
-                  style={[styles.chipText, activeRate?.id === r.id && styles.chipTextActive]}
-                >
-                  {r.type} {Number(r.sell ?? r.value).toLocaleString('es-AR', {
-                    maximumFractionDigits: 0,
-                  })}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          {activeRate && Number(amount) > 0 ? (
-            <Text style={styles.hint}>
-              ≈ {formatAmount(Number(amount) * Number(activeRate.sell ?? activeRate.value), 'ARS')}
-              {activeRate.source === 'db-fallback' || activeRate.source === 'stub'
-                ? ' · cotización estimada'
-                : ''}
-            </Text>
-          ) : null}
-        </>
+        <Group label="Cotización">
+          {(rates.data ?? []).map((r) => (
+            <Chip
+              key={r.id}
+              label={`${r.type} ${Number(r.sell ?? r.value).toLocaleString('es-AR', {
+                maximumFractionDigits: 0,
+              })}`}
+              selected={activeRate?.id === r.id}
+              onPress={() => setRateType(r.type)}
+            />
+          ))}
+        </Group>
       ) : null}
 
-      <Text style={styles.label}>Descripción</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ej. Cobro cliente X"
-        placeholderTextColor={colors.muted}
-        value={description}
-        onChangeText={setDescription}
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Pressable style={styles.button} onPress={submit} disabled={create.isPending}>
-        {create.isPending ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Guardar movimiento</Text>
-        )}
-      </Pressable>
-    </ScrollView>
+      {error ? (
+        <View style={styles.error}>
+          <Txt variant="captionStrong" tone="danger">
+            {error}
+          </Txt>
+        </View>
+      ) : null}
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.muted,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  rowWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  newClientRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
+  title: { marginBottom: spacing.lg },
+  typeRow: { marginBottom: spacing.xl },
+  amountCard: {
     backgroundColor: colors.surface,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  chipActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  chipText: {
-    color: colors.ink,
-    fontSize: 14,
-  },
-  chipTextActive: {
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  amountInput: {
+    ...type.display,
     color: colors.ink,
+    textAlign: 'right',
+    paddingVertical: spacing.xs,
   },
-  button: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
+  field: { marginBottom: spacing.xl },
+  group: { gap: spacing.sm, marginBottom: spacing.xl },
+  inlineCreate: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: -spacing.md,
+    marginBottom: spacing.xl,
   },
-  smallButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minWidth: 88,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  inlineField: { flex: 1 },
   error: {
-    color: colors.danger,
-  },
-  hint: {
-    color: colors.muted,
-    fontSize: 13,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.attentionEdge,
+    backgroundColor: colors.attentionSoft,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
 })

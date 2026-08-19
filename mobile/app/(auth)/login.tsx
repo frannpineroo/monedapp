@@ -1,18 +1,14 @@
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors } from '@/src/theme'
-import { Link } from 'expo-router'
+import { spacing } from '@/src/theme'
+import { Button, Field, LinkButton, Screen, Txt } from '@/src/ui'
+import { Wordmark } from '@/src/ui/Wordmark'
+import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native'
 
 export default function LoginScreen() {
   const { login } = useAuth()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -24,95 +20,76 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo iniciar sesión')
+      setError(e instanceof Error ? e.message : 'No se pudo entrar. Revisá el email y la contraseña.')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.brand}>MonedApp</Text>
-      <Text style={styles.subtitle}>Tu control financiero, sin jerga contable.</Text>
+    <Screen edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.body}>
+          <View style={styles.intro}>
+            <Wordmark />
+            <Txt variant="body" tone="muted">
+              Tu plata en pesos y dólares, en un solo lugar.
+            </Txt>
+          </View>
 
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        placeholder="Email"
-        placeholderTextColor={colors.muted}
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        placeholder="Contraseña"
-        placeholderTextColor={colors.muted}
-        value={password}
-        onChangeText={setPassword}
-      />
+          <View style={styles.form}>
+            <Field
+              label="Email"
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              placeholder="vos@ejemplo.com"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <Field
+              label="Contraseña"
+              secureTextEntry
+              autoComplete="current-password"
+              placeholder="········"
+              value={password}
+              onChangeText={setPassword}
+              error={error ?? undefined}
+              onSubmitEditing={onSubmit}
+              returnKeyType="go"
+            />
+            <Button label="Entrar" size="lg" block loading={busy} onPress={onSubmit} />
+          </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Pressable style={styles.button} onPress={onSubmit} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
-      </Pressable>
-
-      <Link href="/(auth)/register" style={styles.link}>
-        Crear cuenta
-      </Link>
-    </View>
+          <View style={styles.footer}>
+            <Txt variant="caption" tone="faint">
+              ¿Primera vez acá?
+            </Txt>
+            <LinkButton label="Crear cuenta" onPress={() => router.push('/(auth)/register')} />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  flex: { flex: 1 },
+  body: {
     flex: 1,
-    backgroundColor: colors.bg,
-    padding: 24,
     justifyContent: 'center',
-    gap: 12,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.huge,
   },
-  brand: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.muted,
-    marginBottom: 16,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.ink,
-  },
-  button: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
+  intro: { gap: spacing.md },
+  form: { gap: spacing.lg },
+  footer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  link: {
-    textAlign: 'center',
-    color: colors.accent,
-    marginTop: 8,
-    fontSize: 15,
-  },
-  error: {
-    color: colors.danger,
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
 })

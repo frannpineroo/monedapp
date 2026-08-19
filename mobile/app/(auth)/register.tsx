@@ -1,14 +1,8 @@
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors } from '@/src/theme'
+import { spacing } from '@/src/theme'
+import { Button, Field, Screen, Txt } from '@/src/ui'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native'
 
 export default function RegisterScreen() {
   const { register } = useAuth()
@@ -23,89 +17,64 @@ export default function RegisterScreen() {
     try {
       await register(email.trim(), password)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo crear la cuenta')
+      setError(e instanceof Error ? e.message : 'No se pudo crear la cuenta.')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Empezá en minutos</Text>
-      <Text style={styles.subtitle}>Después elegís tu perfil y armamos tus billeteras.</Text>
+    <Screen edges={['bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.body}>
+          <View style={styles.intro}>
+            <Txt variant="title">Empezá en minutos</Txt>
+            <Txt variant="body" tone="muted">
+              Elegís tu perfil y te armamos las billeteras y categorías.
+            </Txt>
+          </View>
 
-      <TextInput
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        placeholder="Email"
-        placeholderTextColor={colors.muted}
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        placeholder="Contraseña (mín. 8)"
-        placeholderTextColor={colors.muted}
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Pressable style={styles.button} onPress={onSubmit} disabled={busy}>
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Crear cuenta</Text>
-        )}
-      </Pressable>
-    </View>
+          <View style={styles.form}>
+            <Field
+              label="Email"
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              placeholder="vos@ejemplo.com"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <Field
+              label="Contraseña"
+              secureTextEntry
+              autoComplete="new-password"
+              placeholder="Elegí una contraseña"
+              hint="Usá al menos 8 caracteres."
+              value={password}
+              onChangeText={setPassword}
+              error={error ?? undefined}
+              onSubmitEditing={onSubmit}
+              returnKeyType="go"
+            />
+            <Button label="Crear cuenta" size="lg" block loading={busy} onPress={onSubmit} />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  flex: { flex: 1 },
+  body: {
     flex: 1,
-    backgroundColor: colors.bg,
-    padding: 24,
     justifyContent: 'center',
-    gap: 12,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.xxxl,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.muted,
-    marginBottom: 16,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.ink,
-  },
-  button: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  error: {
-    color: colors.danger,
-  },
+  intro: { gap: spacing.sm },
+  form: { gap: spacing.lg },
 })

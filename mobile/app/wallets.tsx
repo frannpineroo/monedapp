@@ -1,23 +1,12 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { Wallet, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { formatAmount } from '@/src/lib/format'
-import { colors } from '@/src/theme'
-import { formStyles } from '@/src/ui/formStyles'
+import { colors, spacing } from '@/src/theme'
+import { Button, Chip, ChipRow, EmptyState, Field, LedgerCell, ListRow, Screen, Sheet, Txt } from '@/src/ui'
+import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
 
 export default function WalletsScreen() {
   const { accessToken } = useAuth()
@@ -107,145 +96,98 @@ export default function WalletsScreen() {
 
   const balances = useQuery({
     queryKey: ['balance-by-wallet'],
-    queryFn: () =>
-      apiRequest<WalletBalance[]>('/reports/balance-by-wallet', { token: accessToken }),
+    queryFn: () => apiRequest<WalletBalance[]>('/reports/balance-by-wallet', { token: accessToken }),
     enabled: !!accessToken,
   })
 
   return (
-    <View style={styles.container}>
+    <Screen
+      edges={['bottom']}
+      footer={<Button label="Nueva billetera" size="lg" block onPress={openCreate} />}
+    >
       {balances.isLoading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+        <ActivityIndicator color={colors.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={balances.data ?? []}
           keyExtractor={(item) => item.wallet.id}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 32 }}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={balances.isFetching}
               onRefresh={() => balances.refetch()}
+              tintColor={colors.muted}
+              colors={[colors.brand]}
+              progressBackgroundColor={colors.surface}
             />
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>Todavía no tenés billeteras.</Text>
+            <EmptyState
+              title="Todavía no tenés billeteras"
+              body="Una billetera por cuenta o efectivo, en la moneda que uses."
+              actionLabel="Nueva billetera"
+              onAction={openCreate}
+            />
           }
           renderItem={({ item }) => (
-            <Pressable style={styles.row} onPress={() => openEdit(item.wallet)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.wallet.name}</Text>
-                <Text style={styles.meta}>{item.currency}</Text>
-              </View>
-              <Text style={styles.balance}>{formatAmount(item.balance, item.currency)}</Text>
-            </Pressable>
+            <ListRow
+              title={item.wallet.name}
+              onPress={() => openEdit(item.wallet)}
+              right={<LedgerCell value={item.balance} currency={item.currency} />}
+            />
           )}
         />
       )}
 
-      <View style={styles.footer}>
-        <Pressable style={formStyles.button} onPress={openCreate}>
-          <Text style={formStyles.buttonText}>Nueva billetera</Text>
-        </Pressable>
-      </View>
+      <Sheet visible={open} title={editing ? 'Editar billetera' : 'Nueva billetera'} onClose={close}>
+        <Field
+          label="Nombre"
+          placeholder="Ej. Mercado Pago"
+          value={name}
+          onChangeText={setName}
+          error={error ?? undefined}
+        />
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
-        <View style={styles.backdrop}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>
-              {editing ? 'Editar billetera' : 'Nueva billetera'}
-            </Text>
-
-            <Text style={formStyles.label}>Nombre</Text>
-            <TextInput
-              style={formStyles.input}
-              placeholder="Ej. Mercado Pago"
-              placeholderTextColor={colors.muted}
-              value={name}
-              onChangeText={setName}
-            />
-
-            {editing ? (
-              <Text style={styles.note}>La moneda ({editing.currency}) no se puede cambiar.</Text>
-            ) : (
-              <>
-                <Text style={formStyles.label}>Moneda</Text>
-                <View style={formStyles.rowWrap}>
-                  {['ARS', 'USD', 'USDT'].map((c) => (
-                    <Pressable
-                      key={c}
-                      style={[formStyles.chip, currency === c && formStyles.chipActive]}
-                      onPress={() => setCurrency(c)}
-                    >
-                      <Text
-                        style={[
-                          formStyles.chipText,
-                          currency === c && formStyles.chipTextActive,
-                        ]}
-                      >
-                        {c}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {error ? <Text style={formStyles.error}>{error}</Text> : null}
-
-            <Pressable style={formStyles.button} onPress={submit} disabled={save.isPending}>
-              {save.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={formStyles.buttonText}>Guardar</Text>
-              )}
-            </Pressable>
-            {editing ? (
-              <Pressable onPress={confirmRemove} disabled={remove.isPending}>
-                <Text style={styles.delete}>Borrar billetera</Text>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={close}>
-              <Text style={styles.cancel}>Cancelar</Text>
-            </Pressable>
+        {editing ? (
+          <Txt variant="caption" tone="faint">
+            La moneda ({editing.currency}) no se puede cambiar.
+          </Txt>
+        ) : (
+          <View style={styles.group}>
+            <Txt variant="label" tone="faint">
+              Moneda
+            </Txt>
+            <ChipRow>
+              {['ARS', 'USD', 'USDT'].map((c) => (
+                <Chip key={c} label={c} selected={currency === c} onPress={() => setCurrency(c)} />
+              ))}
+            </ChipRow>
           </View>
-        </View>
-      </Modal>
-    </View>
+        )}
+
+        <Button label="Guardar" size="lg" block loading={save.isPending} onPress={submit} />
+        {editing ? (
+          <Button
+            label="Borrar billetera"
+            variant="destructive"
+            block
+            loading={remove.isPending}
+            onPress={confirmRemove}
+          />
+        ) : null}
+      </Sheet>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  row: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  loader: { marginTop: spacing.xxxl },
+  list: {
+    gap: spacing.sm,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
-  name: { fontSize: 16, fontWeight: '600', color: colors.ink },
-  meta: { fontSize: 13, color: colors.muted, marginTop: 4 },
-  balance: { fontSize: 15, fontWeight: '700', color: colors.accent },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: 24 },
-  footer: {
-    padding: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    gap: 12,
-  },
-  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  note: { fontSize: 13, color: colors.muted },
-  cancel: { color: colors.muted, textAlign: 'center', paddingVertical: 8 },
-  delete: { color: colors.danger, textAlign: 'center', paddingVertical: 8, fontWeight: '600' },
+  group: { gap: spacing.sm },
 })

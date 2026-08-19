@@ -1,14 +1,22 @@
-import { apiRequest, ApiError } from '@/src/api/client'
+import { ApiError, apiRequest } from '@/src/api/client'
 import type { Client, Movement, Receivable, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount } from '@/src/lib/format'
-import { colors } from '@/src/theme'
-import { formStyles } from '@/src/ui/formStyles'
+import { colors, radius, spacing } from '@/src/theme'
+import { Button, Chip, ChipRow, Field, Money, Screen, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Linking from 'expo-linking'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
+
+const typeLabel: Record<Movement['type'], string> = {
+  income: 'Ingreso',
+  expense: 'Gasto',
+  transfer: 'Transferencia',
+  invoice: 'Factura',
+  collection: 'Cobro',
+}
 
 export default function MovementDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -115,108 +123,124 @@ export default function MovementDetailScreen() {
   }
 
   if (movement.isLoading || !movement.data) {
-    return <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+    return (
+      <Screen contentStyle={styles.centered}>
+        <ActivityIndicator color={colors.brand} />
+      </Screen>
+    )
   }
 
-  const isIncome = movement.data.type === 'income'
+  const data = movement.data
+  const isIncome = data.type === 'income'
+  const isInvoice = data.type === 'invoice'
+  const collecting = isInvoice && receivable.data != null && receivable.data.status !== 'paid'
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, gap: 14 }}>
-      <Text style={styles.amount}>
-        {formatAmount(movement.data.amount, movement.data.currency)}
-      </Text>
-      <Text style={styles.meta}>
-        {movement.data.wallet?.name} · {movement.data.source ?? 'manual'}
-      </Text>
+    <Screen
+      scroll
+      edges={['bottom']}
+      footer={
+        // Cobrar es la acción principal de una factura: ahí el guardado pasa a segundo plano.
+        <Button
+          label={data.needsReview ? 'Confirmar movimiento' : 'Guardar cambios'}
+          variant={collecting ? 'secondary' : 'primary'}
+          size="lg"
+          block
+          loading={confirm.isPending}
+          onPress={() => confirm.mutate()}
+        />
+      }
+    >
+      <View style={styles.hero}>
+        <Txt variant="label" tone="faint">
+          {data.currency}
+        </Txt>
+        <Money value={data.amount} variant="display" />
+        <Txt variant="caption" tone="faint" align="right" style={styles.heroMeta}>
+          {typeLabel[data.type]} · {data.wallet?.name ?? data.currency} · {data.source ?? 'manual'}
+        </Txt>
+      </View>
 
-      <Text style={formStyles.label}>Descripción</Text>
-      <TextInput
-        style={formStyles.input}
+      <Field
+        label="Descripción"
         value={description}
         onChangeText={setDescription}
-        placeholderTextColor={colors.muted}
+        containerStyle={styles.field}
       />
 
       {isIncome ? (
-        <>
-          <Text style={formStyles.label}>Cliente</Text>
-          <View style={formStyles.rowWrap}>
-            <Pressable
-              style={[formStyles.chip, clientId === null && formStyles.chipActive]}
-              onPress={() => setClientId(null)}
-            >
-              <Text
-                style={[formStyles.chipText, clientId === null && formStyles.chipTextActive]}
-              >
-                Sin cliente
-              </Text>
-            </Pressable>
+        <View style={styles.group}>
+          <Txt variant="label" tone="faint">
+            Cliente
+          </Txt>
+          <ChipRow>
+            <Chip label="Sin cliente" selected={clientId === null} onPress={() => setClientId(null)} />
             {(clients.data ?? []).map((c) => (
-              <Pressable
+              <Chip
                 key={c.id}
-                style={[formStyles.chip, clientId === c.id && formStyles.chipActive]}
+                label={c.name}
+                selected={clientId === c.id}
                 onPress={() => setClientId(c.id)}
-              >
-                <Text
-                  style={[formStyles.chipText, clientId === c.id && formStyles.chipTextActive]}
-                >
-                  {c.name}
-                </Text>
-              </Pressable>
+              />
             ))}
-          </View>
-        </>
+          </ChipRow>
+        </View>
       ) : null}
 
-      {movement.data.type === 'invoice' && receivable.data ? (
-        <>
-          <Text style={formStyles.label}>
-            Saldo pendiente: {formatAmount(receivable.data.outstanding, receivable.data.currency)}
-          </Text>
+      {isInvoice && receivable.data ? (
+        <View style={styles.invoiceCard}>
+          <View style={styles.outstandingRow}>
+            <Txt variant="label" tone="faint">
+              Saldo pendiente
+            </Txt>
+            <Money
+              value={receivable.data.outstanding}
+              tone={receivable.data.status === 'overdue' ? 'attention' : 'ink'}
+            />
+          </View>
 
           {receivable.data.collections.length > 0 ? (
-            <View style={{ gap: 4 }}>
+            <View style={styles.collections}>
               {receivable.data.collections.map((c) => (
-                <Text key={c.id} style={styles.meta}>
-                  {new Date(c.date).toLocaleDateString('es-AR')} ·{' '}
-                  {formatAmount(c.amount, c.currency)}
-                </Text>
+                <View key={c.id} style={styles.collectionRow}>
+                  <Txt variant="caption" tone="faint">
+                    {new Date(c.date).toLocaleDateString('es-AR')}
+                  </Txt>
+                  <Money value={c.amount} tone="positive" />
+                </View>
               ))}
             </View>
           ) : null}
 
           {receivable.data.status !== 'paid' ? (
             <>
-              <Text style={formStyles.label}>Cobrar en</Text>
-              <View style={formStyles.rowWrap}>
-                {(wallets.data ?? []).map((w) => (
-                  <Pressable
-                    key={w.id}
-                    style={[formStyles.chip, collectWalletId === w.id && formStyles.chipActive]}
-                    onPress={() => setCollectWalletId(w.id)}
-                  >
-                    <Text
-                      style={[
-                        formStyles.chipText,
-                        collectWalletId === w.id && formStyles.chipTextActive,
-                      ]}
-                    >
-                      {w.name}
-                    </Text>
-                  </Pressable>
-                ))}
+              <View style={styles.group}>
+                <Txt variant="label" tone="faint">
+                  Cobrar en
+                </Txt>
+                <ChipRow>
+                  {(wallets.data ?? []).map((w) => (
+                    <Chip
+                      key={w.id}
+                      label={w.name}
+                      selected={collectWalletId === w.id}
+                      onPress={() => setCollectWalletId(w.id)}
+                    />
+                  ))}
+                </ChipRow>
               </View>
 
-              <TextInput
-                style={formStyles.input}
+              <Field
+                label="Monto del cobro"
                 keyboardType="decimal-pad"
                 value={collectAmount}
                 onChangeText={setCollectAmount}
-                placeholderTextColor={colors.muted}
               />
 
-              <Pressable
-                style={formStyles.button}
+              <Button
+                label="Registrar cobro"
+                block
+                loading={collect.isPending}
                 onPress={() => {
                   setError(null)
                   if (!collectWalletId) {
@@ -225,39 +249,69 @@ export default function MovementDetailScreen() {
                   }
                   collect.mutate()
                 }}
-                disabled={collect.isPending}
-              >
-                {collect.isPending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={formStyles.buttonText}>Registrar cobro</Text>
-                )}
-              </Pressable>
-
-              <Pressable onPress={remindOnWhatsApp}>
-                <Text style={styles.remind}>Recordar por WhatsApp</Text>
-              </Pressable>
+              />
+              <Button label="Recordar por WhatsApp" variant="secondary" block onPress={remindOnWhatsApp} />
             </>
           ) : null}
-        </>
+        </View>
       ) : null}
 
-      {error ? <Text style={formStyles.error}>{error}</Text> : null}
-
-      <Pressable style={formStyles.button} onPress={() => confirm.mutate()} disabled={confirm.isPending}>
-        {confirm.isPending ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={formStyles.buttonText}>Confirmar</Text>
-        )}
-      </Pressable>
-    </ScrollView>
+      {error ? (
+        <View style={styles.error}>
+          <Txt variant="captionStrong" tone="danger">
+            {error}
+          </Txt>
+        </View>
+      ) : null}
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  amount: { fontSize: 28, fontWeight: '700', color: colors.ink },
-  meta: { fontSize: 13, color: colors.muted },
-  remind: { color: colors.accent, textAlign: 'center', paddingVertical: 10, fontWeight: '600' },
+  centered: { alignItems: 'center', justifyContent: 'center' },
+  hero: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  heroMeta: { marginTop: spacing.sm },
+  field: { marginBottom: spacing.xl },
+  group: { gap: spacing.sm, marginBottom: spacing.xl },
+  invoiceCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  outstandingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  collections: {
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  collectionRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  error: {
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.attentionEdge,
+    backgroundColor: colors.attentionSoft,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
 })

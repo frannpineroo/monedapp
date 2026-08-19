@@ -1,11 +1,12 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Client, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors } from '@/src/theme'
-import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { colors, radius, spacing } from '@/src/theme'
+import { Button, Screen, Section, Txt } from '@/src/ui'
+import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useRouter, type Href } from 'expo-router'
+import { Pressable, StyleSheet, View } from 'react-native'
 
 export default function SettingsScreen() {
   const { accessToken, user, logout } = useAuth()
@@ -29,71 +30,85 @@ export default function SettingsScreen() {
     enabled: !!accessToken,
   })
 
-  const rows = [
-    { href: '/wallets' as const, label: 'Billeteras', count: wallets.data?.length },
-    { href: '/clients' as const, label: 'Clientes', count: clients.data?.length },
-    { href: '/categories' as const, label: 'Categorías', count: categories.data?.length },
+  const rows: { href: Href; label: string; count?: number }[] = [
+    { href: '/wallets', label: 'Billeteras', count: wallets.data?.length },
+    { href: '/clients', label: 'Clientes', count: clients.data?.length },
+    { href: '/categories', label: 'Categorías', count: categories.data?.length },
+    { href: '/integrations', label: 'Integraciones' },
   ]
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionLabel}>Tu cuenta</Text>
-      <View style={styles.card}>
-        {rows.map((row) => (
-          <Pressable key={row.href} style={styles.row} onPress={() => router.push(row.href)}>
-            <Text style={styles.rowLabel}>{row.label}</Text>
-            <View style={styles.rowRight}>
-              <Text style={styles.rowCount}>{row.count ?? '—'}</Text>
-              <FontAwesome name="chevron-right" size={13} color={colors.muted} />
-            </View>
-          </Pressable>
-        ))}
-      </View>
+    <Screen scroll>
+      <Txt variant="title" style={styles.title}>
+        Ajustes
+      </Txt>
 
-      <Text style={styles.sectionLabel}>Perfil</Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>Email</Text>
-          <Text style={styles.rowValue}>{user?.email}</Text>
+      <Section title="Tus datos">
+        <View style={styles.card}>
+          {rows.map((row, index) => (
+            <Pressable
+              key={String(row.href)}
+              onPress={() => router.push(row.href)}
+              style={({ pressed }) => [
+                styles.row,
+                index < rows.length - 1 && styles.rowBorder,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <Txt variant="bodyMedium">{row.label}</Txt>
+              <View style={styles.rowRight}>
+                {row.count !== undefined ? (
+                  <Txt variant="caption" tone="faint">
+                    {row.count}
+                  </Txt>
+                ) : null}
+                <Feather name="chevron-right" size={16} color={colors.faint} />
+              </View>
+            </Pressable>
+          ))}
         </View>
-        <Pressable style={styles.row} onPress={() => logout()}>
-          <Text style={styles.logout}>Cerrar sesión</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+      </Section>
+
+      <Section title="Cuenta">
+        <View style={styles.card}>
+          <View style={[styles.row, styles.rowBorder]}>
+            <Txt variant="bodyMedium">Email</Txt>
+            <Txt variant="caption" tone="faint">
+              {user?.email}
+            </Txt>
+          </View>
+          <View style={styles.logoutRow}>
+            <Button label="Cerrar sesión" variant="destructive" block onPress={() => logout()} />
+          </View>
+        </View>
+      </Section>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 20, paddingBottom: 40, gap: 10 },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 10,
-  },
+  title: { marginBottom: spacing.xxl },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    minHeight: 52,
+  },
+  rowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowLabel: { fontSize: 16, color: colors.ink },
-  rowValue: { fontSize: 14, color: colors.muted },
-  rowCount: { fontSize: 14, color: colors.muted },
-  logout: { fontSize: 16, color: colors.danger, fontWeight: '600' },
+  rowPressed: { backgroundColor: colors.surfaceRaised },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  logoutRow: { padding: spacing.lg },
 })

@@ -1,16 +1,25 @@
 import { apiRequest } from '@/src/api/client'
 import type { Movement } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors } from '@/src/theme'
-import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { colors, fonts, radius } from '@/src/theme'
+import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
-import { Tabs } from 'expo-router'
+import { Tabs } from 'expo-router/js-tabs'
+import { StyleSheet, View } from 'react-native'
 
-function TabIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name']
-  color: string
-}) {
-  return <FontAwesome size={22} style={{ marginBottom: -2 }} {...props} />
+type FeatherName = React.ComponentProps<typeof Feather>['name']
+
+function TabIcon({ name, color }: { name: FeatherName; color: string }) {
+  return <Feather name={name} size={22} color={color} />
+}
+
+/** La acción principal del ledger: cargar un movimiento. Va marcada, no escondida. */
+function NewMovementIcon({ focused }: { focused: boolean }) {
+  return (
+    <View style={[styles.newIcon, focused && styles.newIconFocused]}>
+      <Feather name="plus" size={20} color={colors.onBrand} />
+    </View>
+  )
 }
 
 export default function TabLayout() {
@@ -25,18 +34,20 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.muted,
-        headerStyle: { backgroundColor: colors.bg },
-        headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: colors.surface },
+        headerShown: false,
+        tabBarActiveTintColor: colors.brand,
+        tabBarInactiveTintColor: colors.faint,
+        tabBarStyle: styles.bar,
+        tabBarLabelStyle: styles.label,
+        tabBarBadgeStyle: styles.badge,
+        sceneStyle: { backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ color }) => <TabIcon name="credit-card" color={String(color)} />,
+          tabBarIcon: ({ color }) => <TabIcon name="home" color={String(color)} />,
         }}
       />
       <Tabs.Screen
@@ -50,7 +61,7 @@ export default function TabLayout() {
         name="new-movement"
         options={{
           title: 'Nuevo',
-          tabBarIcon: ({ color }) => <TabIcon name="plus-circle" color={String(color)} />,
+          tabBarIcon: ({ focused }) => <NewMovementIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -65,9 +76,39 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Ajustes',
-          tabBarIcon: ({ color }) => <TabIcon name="cog" color={String(color)} />,
+          tabBarIcon: ({ color }) => <TabIcon name="settings" color={String(color)} />,
         }}
       />
     </Tabs>
   )
 }
+
+const styles = StyleSheet.create({
+  bar: {
+    backgroundColor: colors.bg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    elevation: 0,
+  },
+  label: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    letterSpacing: 0.1,
+  },
+  // El contador de pendientes pide una acción: va en arcilla, no en pizarra.
+  badge: {
+    backgroundColor: colors.attention,
+    color: colors.bg,
+    fontFamily: fonts.semibold,
+    fontSize: 11,
+  },
+  newIcon: {
+    width: 34,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.brandPressed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newIconFocused: { backgroundColor: colors.brand },
+})

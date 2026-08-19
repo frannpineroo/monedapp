@@ -1,17 +1,12 @@
 import { apiRequest } from '@/src/api/client'
 import type { ProfileTemplate, User } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors } from '@/src/theme'
+import { colors, radius, spacing } from '@/src/theme'
+import { Card, Screen, Txt } from '@/src/ui'
+import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
 
 export default function OnboardingScreen() {
   const { accessToken, setUser } = useAuth()
@@ -43,80 +38,66 @@ export default function OnboardingScreen() {
 
   if (templates.isLoading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
+      <Screen contentStyle={styles.centered}>
+        <ActivityIndicator color={colors.brand} />
+      </Screen>
     )
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>¿Cómo laburás?</Text>
-      <Text style={styles.subtitle}>Elegí una plantilla. Armamos tus billeteras automáticamente.</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <FlatList
-        data={templates.data ?? []}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ gap: 12, paddingTop: 8 }}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() => choose(item.id)}
-            disabled={busyId !== null}
-          >
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <Text style={styles.cardDesc}>{item.description}</Text>
-            {busyId === item.id ? <ActivityIndicator color={colors.accent} /> : null}
-          </Pressable>
-        )}
-      />
-    </View>
+    <Screen scroll contentStyle={styles.content}>
+      <View style={styles.intro}>
+        <Txt variant="title">¿Cómo laburás?</Txt>
+        <Txt variant="body" tone="muted">
+          Elegí una plantilla y te armamos las billeteras y categorías.
+        </Txt>
+      </View>
+
+      {error ? (
+        <View style={styles.error}>
+          <Txt variant="captionStrong" tone="danger">
+            {error}
+          </Txt>
+        </View>
+      ) : null}
+
+      <View style={styles.list}>
+        {(templates.data ?? []).map((item) => (
+          <Card key={item.id} onPress={busyId === null ? () => choose(item.id) : undefined}>
+            <View style={styles.cardRow}>
+              <View style={styles.cardText}>
+                <Txt variant="bodyStrong">{item.name}</Txt>
+                <Txt variant="caption" tone="faint" style={styles.cardDesc}>
+                  {item.description}
+                </Txt>
+              </View>
+              {busyId === item.id ? (
+                <ActivityIndicator color={colors.brand} />
+              ) : (
+                <Feather name="arrow-right" size={18} color={colors.faint} />
+              )}
+            </View>
+          </Card>
+        ))}
+      </View>
+    </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    padding: 24,
-    paddingTop: 64,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bg,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.muted,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 6,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.ink,
-  },
-  cardDesc: {
-    fontSize: 14,
-    color: colors.muted,
-  },
+  centered: { alignItems: 'center', justifyContent: 'center' },
+  content: { paddingTop: spacing.huge },
+  intro: { gap: spacing.sm, marginBottom: spacing.xxxl },
+  list: { gap: spacing.md },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  cardText: { flex: 1 },
+  cardDesc: { marginTop: spacing.xs },
   error: {
-    color: colors.danger,
-    marginBottom: 8,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.attentionEdge,
+    backgroundColor: colors.attentionSoft,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
 })
