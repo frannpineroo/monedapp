@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native'
 
-type MovementType = 'income' | 'expense' | 'transfer'
+type MovementType = 'income' | 'expense' | 'transfer' | 'invoice'
 
 export default function NewMovementScreen() {
   const { accessToken } = useAuth()
@@ -44,6 +44,8 @@ export default function NewMovementScreen() {
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [invoiceCurrency, setInvoiceCurrency] = useState('ARS')
+  const [dueDate, setDueDate] = useState('')
 
   const categoryKind = type === 'expense' ? 'EXPENSE' : 'INCOME'
 
@@ -66,7 +68,7 @@ export default function NewMovementScreen() {
     () => (wallets.data ?? []).find((w) => w.id === selectedWalletId) ?? null,
     [wallets.data, selectedWalletId]
   )
-  const currency = selectedWallet?.currency ?? 'ARS'
+  const currency = type === 'invoice' ? invoiceCurrency : (selectedWallet?.currency ?? 'ARS')
   const today = new Date().toISOString().slice(0, 10)
 
   const rates = useQuery({
@@ -123,25 +125,39 @@ export default function NewMovementScreen() {
       apiRequest<Movement>('/movements', {
         method: 'POST',
         token: accessToken,
-        body: {
-          walletId: selectedWalletId,
-          toWalletId: type === 'transfer' ? toWalletId : undefined,
-          clientId: type === 'income' && clientId ? clientId : undefined,
-          categoryId: type !== 'transfer' ? (categoryId ?? undefined) : undefined,
-          type,
-          amount: Number(amount),
-          description,
-          date: new Date().toISOString().slice(0, 10),
-          exchangeRateType: currency !== 'ARS' ? (activeRate?.type ?? undefined) : undefined,
-        },
+        body:
+          type === 'invoice'
+            ? {
+                type: 'invoice',
+                clientId,
+                amount: Number(amount),
+                currency: invoiceCurrency,
+                dueDate,
+                description,
+                date: new Date().toISOString().slice(0, 10),
+                categoryId: categoryId ?? undefined,
+              }
+            : {
+                walletId: selectedWalletId,
+                toWalletId: type === 'transfer' ? toWalletId : undefined,
+                clientId: type === 'income' && clientId ? clientId : undefined,
+                categoryId: type !== 'transfer' ? (categoryId ?? undefined) : undefined,
+                type,
+                amount: Number(amount),
+                description,
+                date: new Date().toISOString().slice(0, 10),
+                exchangeRateType: currency !== 'ARS' ? (activeRate?.type ?? undefined) : undefined,
+              },
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['movements'] })
       await queryClient.invalidateQueries({ queryKey: ['balance-by-wallet'] })
+      await queryClient.invalidateQueries({ queryKey: ['receivables'] })
       setAmount('')
       setDescription('')
       setClientId(null)
       setCategoryId(null)
+      setDueDate('')
       router.push('/(tabs)/movements')
     },
     onError: (e) => {
@@ -156,7 +172,7 @@ export default function NewMovementScreen() {
 
   function selectType(next: MovementType) {
     setType(next)
-    if (next !== 'income') {
+    if (next !== 'income' && next !== 'invoice') {
       setClientId(null)
       setShowNewClient(false)
       setNewClientName('')
@@ -168,7 +184,16 @@ export default function NewMovementScreen() {
 
   function submit() {
     setError(null)
-    if (!selectedWalletId) {
+    if (type === 'invoice') {
+      if (!clientId) {
+        setError('Elegí un cliente para la factura')
+        return
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+        setError('Escribí el vencimiento como 2026-09-14')
+        return
+      }
+    } else if (!selectedWalletId) {
       setError('Elegí una billetera')
       return
     }
@@ -180,7 +205,7 @@ export default function NewMovementScreen() {
       setError('El monto debe ser mayor a 0')
       return
     }
-    if (type !== 'transfer' && !categoryId) {
+    if (type !== 'transfer' && type !== 'invoice' && !categoryId) {
       setError('Elegí una categoría')
       return
     }
@@ -214,36 +239,74 @@ export default function NewMovementScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, gap: 14 }}>
       <Text style={styles.label}>Tipo</Text>
-      <View style={styles.row}>
-        {(['income', 'expense', 'transfer'] as MovementType[]).map((t) => (
+      <View style={styles.rowWrap}>
+        {(['income', 'expense', 'transfer', 'invoice'] as MovementType[]).map((t) => (
           <Pressable
             key={t}
             style={[styles.chip, type === t && styles.chipActive]}
             onPress={() => selectType(t)}
           >
             <Text style={[styles.chipText, type === t && styles.chipTextActive]}>
-              {t === 'income' ? 'Ingreso' : t === 'expense' ? 'Gasto' : 'Transferencia'}
+              {t === 'income'
+                ? 'Ingreso'
+                : t === 'expense'
+                  ? 'Gasto'
+                  : t === 'transfer'
+                    ? 'Transferencia'
+                    : 'Factura'}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      <Text style={styles.label}>{type === 'transfer' ? 'Desde' : 'Billetera'}</Text>
-      <View style={styles.rowWrap}>
-        {(wallets.data ?? []).map((w) => (
-          <Pressable
-            key={w.id}
-            style={[styles.chip, selectedWalletId === w.id && styles.chipActive]}
-            onPress={() => setWalletId(w.id)}
-          >
-            <Text
-              style={[styles.chipText, selectedWalletId === w.id && styles.chipTextActive]}
-            >
-              {w.name}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      {type === 'invoice' ? (
+        <>
+          <Text style={styles.label}>Moneda</Text>
+          <View style={styles.rowWrap}>
+            {['ARS', 'USD', 'USDT'].map((c) => (
+              <Pressable
+                key={c}
+                style={[styles.chip, invoiceCurrency === c && styles.chipActive]}
+                onPress={() => setInvoiceCurrency(c)}
+              >
+                <Text
+                  style={[styles.chipText, invoiceCurrency === c && styles.chipTextActive]}
+                >
+                  {c}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Vence el</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="2026-09-14"
+            placeholderTextColor={colors.muted}
+            value={dueDate}
+            onChangeText={setDueDate}
+          />
+        </>
+      ) : (
+        <>
+          <Text style={styles.label}>{type === 'transfer' ? 'Desde' : 'Billetera'}</Text>
+          <View style={styles.rowWrap}>
+            {(wallets.data ?? []).map((w) => (
+              <Pressable
+                key={w.id}
+                style={[styles.chip, selectedWalletId === w.id && styles.chipActive]}
+                onPress={() => setWalletId(w.id)}
+              >
+                <Text
+                  style={[styles.chipText, selectedWalletId === w.id && styles.chipTextActive]}
+                >
+                  {w.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
 
       {type === 'transfer' ? (
         <>
@@ -264,18 +327,20 @@ export default function NewMovementScreen() {
         </>
       ) : null}
 
-      {type === 'income' ? (
+      {type === 'income' || type === 'invoice' ? (
         <>
-          <Text style={styles.label}>Cliente (opcional)</Text>
+          <Text style={styles.label}>{type === 'invoice' ? 'Cliente' : 'Cliente (opcional)'}</Text>
           <View style={styles.rowWrap}>
-            <Pressable
-              style={[styles.chip, clientId === null && styles.chipActive]}
-              onPress={() => setClientId(null)}
-            >
-              <Text style={[styles.chipText, clientId === null && styles.chipTextActive]}>
-                Sin cliente
-              </Text>
-            </Pressable>
+            {type === 'income' ? (
+              <Pressable
+                style={[styles.chip, clientId === null && styles.chipActive]}
+                onPress={() => setClientId(null)}
+              >
+                <Text style={[styles.chipText, clientId === null && styles.chipTextActive]}>
+                  Sin cliente
+                </Text>
+              </Pressable>
+            ) : null}
             {(clients.data ?? []).map((c) => (
               <Pressable
                 key={c.id}

@@ -60,20 +60,46 @@ export type ExchangeRate = {
 
 export type Movement = {
   id: string
-  walletId: string
+  walletId: string | null
   clientId: string | null
   toWalletId: string | null
-  type: 'income' | 'expense' | 'transfer'
+  type: 'income' | 'expense' | 'transfer' | 'invoice' | 'collection'
   amount: string | number
   currency: string
   description: string
   date: string
+  dueDate?: string | null
+  invoiceId?: string | null
   needsReview?: boolean
   source?: string
   wallet?: { id: string; name: string; currency: string }
   client?: { id: string; name: string } | null
   category?: { id: string; name: string } | null
   exchangeRate?: ExchangeRate
+}
+
+export type ReceivableStatus = 'pending' | 'partial' | 'overdue' | 'paid'
+
+export type Receivable = {
+  id: string
+  description: string
+  client: { id: string; name: string; phone: string | null } | null
+  amount: number
+  currency: string
+  date: string
+  dueDate: string | null
+  collected: number
+  outstanding: number
+  status: ReceivableStatus
+  daysOverdue: number
+  collections: { id: string; amount: string | number; currency: string; date: string }[]
+}
+
+export type ReceivablesSummary = {
+  byCurrency: Record<string, number>
+  totalArs: number
+  overdueArs: number
+  aging: { '0-30': number; '31-60': number; '61+': number }
 }
 
 export type Integration = {

@@ -19,6 +19,8 @@ const typeLabel: Record<Movement['type'], string> = {
   income: 'Ingreso',
   expense: 'Gasto',
   transfer: 'Transferencia',
+  invoice: 'Factura',
+  collection: 'Cobro',
 }
 
 type TypeFilter = 'all' | Movement['type']
