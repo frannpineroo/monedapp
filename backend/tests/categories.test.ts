@@ -343,3 +343,51 @@ describe('GET /movements?categoryId', () => {
     expect(res.body[0].description).toBe('Gasto B')
   })
 })
+
+describe('GET /reports/by-category', () => {
+  it('suma en ARS con el snapshot de cada movimiento y los percent dan 100', async () => {
+    const { token, wallets } = await setupUser()
+    const categories = await request(app).get('/categories?kind=EXPENSE').set(auth(token))
+    const [primera, segunda] = categories.body as { id: string; name: string }[]
+    const ars = wallets.find((w) => w.currency === 'ARS')!
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const month = new Date().toISOString().slice(0, 7)
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: ars.id,
+        type: 'expense',
+        amount: 1000,
+        description: 'Gasto en pesos',
+        categoryId: primera.id,
+      })
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: usd.id,
+        type: 'expense',
+        amount: 10,
+        description: 'Gasto en dólares',
+        categoryId: segunda.id,
+      })
+
+    const res = await request(app)
+      .get(`/reports/by-category?month=${month}&type=expense`)
+      .set(auth(token))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(2)
+
+    const total = res.body.reduce((sum: number, r: { total: number }) => sum + r.total, 0)
+    // El gasto en USD pesa mucho más: el snapshot lo convierte a ARS.
+    expect(total).toBeGreaterThan(1000)
+    expect(res.body[0].total).toBeGreaterThanOrEqual(res.body[1].total)
+
+    const percent = res.body.reduce((sum: number, r: { percent: number }) => sum + r.percent, 0)
+    expect(Math.round(percent)).toBe(100)
+  })
+})
