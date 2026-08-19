@@ -138,3 +138,58 @@ describe('POST /categories', () => {
     expect(second.body).toHaveLength(first.body.length)
   })
 })
+
+describe('PATCH y DELETE /categories/:id', () => {
+  async function createCategory(token: string, name: string, kind = 'EXPENSE') {
+    const res = await request(app).post('/categories').set(auth(token)).send({ name, kind })
+    return res.body as { id: string; name: string; kind: string }
+  }
+
+  it('renombra una categoría', async () => {
+    const { token } = await setupUser()
+    const category = await createCategory(token, 'Publicidad')
+
+    const res = await request(app)
+      .patch(`/categories/${category.id}`)
+      .set(auth(token))
+      .send({ name: 'Marketing' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('Marketing')
+  })
+
+  it('borra una categoría libre → 204', async () => {
+    const { token } = await setupUser()
+    const category = await createCategory(token, 'Sin uso')
+
+    const res = await request(app).delete(`/categories/${category.id}`).set(auth(token))
+
+    expect(res.status).toBe(204)
+  })
+
+  it('categoría de otro usuario → 404', async () => {
+    const owner = await setupUser()
+    const intruder = await setupUser()
+    const category = await createCategory(owner.token, 'Privada')
+
+    const res = await request(app).delete(`/categories/${category.id}`).set(auth(intruder.token))
+
+    expect(res.status).toBe(404)
+  })
+
+  it('última categoría del kind → 400', async () => {
+    const { token } = await setupUser()
+    const income = await request(app).get('/categories?kind=INCOME').set(auth(token))
+    const ids = (income.body as { id: string }[]).map((c) => c.id)
+
+    // Borrar todas menos una.
+    for (const id of ids.slice(0, -1)) {
+      await request(app).delete(`/categories/${id}`).set(auth(token))
+    }
+
+    const res = await request(app).delete(`/categories/${ids[ids.length - 1]}`).set(auth(token))
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('No se puede borrar la última categoría de este tipo')
+  })
+})
