@@ -1,4 +1,4 @@
-import { Client, Movement, Wallet } from '@prisma/client'
+import { Account, Client, Movement, Wallet } from '@prisma/client'
 
 export function serializeWallet(wallet: Wallet) {
   return {
@@ -18,6 +18,14 @@ export function serializeClient(client: Client) {
     defaultCurrency: client.defaultCurrency,
     createdAt: client.createdAt,
     updatedAt: client.updatedAt,
+  }
+}
+
+export function serializeCategory(account: Account) {
+  return {
+    id: account.id,
+    name: account.name,
+    kind: account.kind,
   }
 }
 

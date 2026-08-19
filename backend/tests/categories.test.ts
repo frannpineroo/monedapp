@@ -69,3 +69,36 @@ describe('categorías del onboarding', () => {
     expect(operativos).not.toBeNull()
   })
 })
+
+describe('GET /categories', () => {
+  it('filtra por kind y no expone las cuentas de billetera', async () => {
+    const { token } = await setupUser()
+
+    const res = await request(app).get('/categories?kind=EXPENSE').set(auth(token))
+
+    expect(res.status).toBe(200)
+    expect(res.body.length).toBeGreaterThanOrEqual(6)
+    expect(res.body.every((c: { kind: string }) => c.kind === 'EXPENSE')).toBe(true)
+    expect(res.body.map((c: { name: string }) => c.name)).not.toContain('Caja ARS')
+    expect(res.body[0]).toEqual({
+      id: expect.any(String),
+      name: expect.any(String),
+      kind: 'EXPENSE',
+    })
+  })
+
+  it('sin kind devuelve gastos e ingresos', async () => {
+    const { token } = await setupUser()
+
+    const res = await request(app).get('/categories').set(auth(token))
+
+    const kinds = new Set(res.body.map((c: { kind: string }) => c.kind))
+    expect(kinds).toEqual(new Set(['EXPENSE', 'INCOME']))
+  })
+
+  it('kind inválido → 400', async () => {
+    const { token } = await setupUser()
+    const res = await request(app).get('/categories?kind=ASSET').set(auth(token))
+    expect(res.status).toBe(400)
+  })
+})
