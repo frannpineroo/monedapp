@@ -108,4 +108,34 @@ describe('wallets', () => {
 
     expect(res.status).toBe(404)
   })
+
+  it('PATCH /wallets/:id renombra la billetera y su cuenta espejo', async () => {
+    const { token } = await setupUser()
+    const wallet = await createWallet(token, 'Mercado Pago', 'ARS')
+
+    const res = await request(app)
+      .patch(`/wallets/${wallet.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'MP' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('MP')
+
+    const updated = await prisma.wallet.findUnique({ where: { id: wallet.id } })
+    const account = await prisma.account.findUnique({ where: { id: updated!.accountId } })
+    expect(account!.name).toBe('MP (ARS)')
+  })
+
+  it('PATCH /wallets/:id con un nombre ya usado → 409', async () => {
+    const { token } = await setupUser()
+    await createWallet(token, 'Mercado Pago', 'ARS')
+    const otra = await createWallet(token, 'Banco', 'ARS')
+
+    const res = await request(app)
+      .patch(`/wallets/${otra.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Mercado Pago' })
+
+    expect(res.status).toBe(409)
+  })
 })
