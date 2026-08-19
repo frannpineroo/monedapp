@@ -280,3 +280,36 @@ describe('POST /movements con categoría', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('PATCH /movements/:id cambiando categoría', () => {
+  it('regenera el asiento contra la categoría nueva y sigue balanceado', async () => {
+    const { token, wallets } = await setupUser()
+    const categories = await request(app).get('/categories?kind=EXPENSE').set(auth(token))
+    const [primera, segunda] = categories.body as { id: string; name: string }[]
+
+    const created = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: wallets[0].id,
+        type: 'expense',
+        amount: 1000,
+        description: 'Licencia anual',
+        categoryId: primera.id,
+      })
+
+    const res = await request(app)
+      .patch(`/movements/${created.body.id}`)
+      .set(auth(token))
+      .send({ categoryId: segunda.id })
+
+    expect(res.status).toBe(200)
+    expect(res.body.category.id).toBe(segunda.id)
+
+    const entries = await prisma.ledgerEntry.findMany({ where: { movementId: created.body.id } })
+    expect(entries).toHaveLength(2)
+    expect(entries.map((e) => e.accountId)).toContain(segunda.id)
+    expect(entries.map((e) => e.accountId)).not.toContain(primera.id)
+    expect(entries.reduce((sum, e) => sum + Number(e.change), 0)).toBe(0)
+  })
+})

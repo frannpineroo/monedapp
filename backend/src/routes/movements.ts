@@ -219,7 +219,7 @@ router.patch(
     })
     if (!existing) throw new AppError(404, 'Movimiento no encontrado')
 
-    const { description, date, clientId } = req.body as Record<string, unknown>
+    const { description, date, clientId, categoryId } = req.body as Record<string, unknown>
     const data: Prisma.MovementUpdateInput = {}
 
     if (description !== undefined) {
@@ -243,6 +243,42 @@ router.patch(
       } else {
         throw new AppError(400, 'clientId inválido')
       }
+    }
+
+    if (categoryId !== undefined) {
+      const categoryAccountId = await resolveCategoryAccountId(userId, existing.type, categoryId)
+
+      const movement = await prisma.$transaction(async (tx) => {
+        const updated = await tx.movement.update({
+          where: { id: existing.id },
+          data: {
+            ...data,
+            categoryAccount: categoryAccountId
+              ? { connect: { id: categoryAccountId } }
+              : { disconnect: true },
+          },
+        })
+
+        // Monto, tipo y billetera no cambian: alcanza con reescribir las dos patas.
+        await tx.ledgerEntry.deleteMany({ where: { movementId: updated.id } })
+        await createLedgerForMovement(tx, {
+          userId,
+          movementId: updated.id,
+          type: updated.type,
+          amount: updated.amount,
+          currency: updated.currency,
+          walletAccountId: existing.wallet.accountId,
+          categoryAccountId,
+        })
+
+        return tx.movement.findUniqueOrThrow({
+          where: { id: updated.id },
+          include: movementInclude,
+        })
+      })
+
+      res.json(serializeMovement(movement))
+      return
     }
 
     const movement = await prisma.movement.update({
