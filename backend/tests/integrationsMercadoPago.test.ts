@@ -8,9 +8,11 @@ process.env.MP_WEBHOOK_SECRET ??= 'test-secret'
 process.env.INTEGRATIONS_ENCRYPTION_KEY ??= 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='
 
 import request from 'supertest'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app'
+import { httpClient } from '../src/lib/httpClient'
 import { prisma } from '../src/prisma/prisma'
+import { fakeMpFetch, tokenResponse } from './helpers/mpFixtures'
 
 const app = createApp()
 
@@ -99,5 +101,83 @@ describe('ensureProviderWallet', () => {
     )
 
     expect(wallet.name).toBe('Mercado Pago ARS (integración)')
+  })
+})
+
+describe('rutas de integraciones', () => {
+  const realFetch = httpClient.fetch
+
+  afterEach(() => {
+    httpClient.fetch = realFetch
+  })
+
+  it('connect devuelve una URL con PKCE y el callback vuelve al deep link', async () => {
+    const { token } = await registerAndOnboard()
+    const fake = fakeMpFetch({ token: { ...tokenResponse, user_id: Date.now() } })
+    httpClient.fetch = fake.fetchImpl
+
+    const connect = await request(app)
+      .post('/integrations/mercadopago/connect')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ mobileRedirectUri: 'monedapp://integrations/mercadopago' })
+
+    expect(connect.status).toBe(200)
+    const url = new URL(connect.body.authorizationUrl)
+    expect(url.searchParams.get('code_challenge')).toBeTruthy()
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+
+    const state = url.searchParams.get('state')!
+    const callback = await request(app).get(
+      `/integrations/mercadopago/callback?code=code-1&state=${state}`
+    )
+
+    expect(callback.status).toBe(302)
+    expect(callback.headers.location).toContain('monedapp://integrations/mercadopago')
+    expect(callback.headers.location).toContain('status=connected')
+
+    const list = await request(app).get('/integrations').set('Authorization', `Bearer ${token}`)
+    expect(list.body[0].status).toBe('connected')
+    expect(list.body[0].credentials).toBeUndefined()
+  })
+
+  it('un state ya usado redirige con status=error', async () => {
+    const { token } = await registerAndOnboard()
+    httpClient.fetch = fakeMpFetch({ token: { ...tokenResponse, user_id: Date.now() } }).fetchImpl
+
+    const connect = await request(app)
+      .post('/integrations/mercadopago/connect')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ mobileRedirectUri: 'monedapp://integrations/mercadopago' })
+    const state = new URL(connect.body.authorizationUrl).searchParams.get('state')!
+
+    await request(app).get(`/integrations/mercadopago/callback?code=code-1&state=${state}`)
+    const replay = await request(app).get(
+      `/integrations/mercadopago/callback?code=code-1&state=${state}`
+    )
+
+    expect(replay.status).toBe(302)
+    expect(replay.headers.location).toContain('status=error')
+  })
+
+  it('mobileRedirectUri de otro esquema → 400', async () => {
+    const { token } = await registerAndOnboard()
+
+    const res = await request(app)
+      .post('/integrations/mercadopago/connect')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ mobileRedirectUri: 'https://evil.test/steal' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('proveedor desconocido → 400', async () => {
+    const { token } = await registerAndOnboard()
+
+    const res = await request(app)
+      .post('/integrations/stripe/connect')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ mobileRedirectUri: 'monedapp://integrations/stripe' })
+
+    expect(res.status).toBe(400)
   })
 })

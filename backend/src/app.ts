@@ -8,6 +8,8 @@ import movementsRouter from './routes/movements'
 import reportsRouter from './routes/reports'
 import categoriesRouter from './routes/categories'
 import exchangeRatesRouter from './routes/exchangeRates'
+import integrationsCallbackRouter from './routes/integrationsCallback'
+import integrationsRouter from './routes/integrations'
 
 export function createApp() {
   const app = express()
@@ -27,6 +29,8 @@ export function createApp() {
   app.use('/reports', reportsRouter)
   app.use('/categories', categoriesRouter)
   app.use('/exchange-rates', exchangeRatesRouter)
+  app.use('/integrations', integrationsCallbackRouter)
+  app.use('/integrations', integrationsRouter)
 
   return app
 }

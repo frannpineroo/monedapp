@@ -1,4 +1,4 @@
-import { Account, Client, Movement, Wallet } from '@prisma/client'
+import { Account, Client, Integration, Movement, Wallet } from '@prisma/client'
 
 export function serializeWallet(wallet: Wallet) {
   return {
@@ -78,5 +78,17 @@ export function serializeMovement(
           date: movement.exchangeRate.date,
         }
       : undefined,
+  }
+}
+
+/** Nunca emite `credentials`: son tokens cifrados del proveedor. */
+export function serializeIntegration(integration: Integration) {
+  return {
+    provider: integration.provider,
+    status: integration.status,
+    externalAccountId: integration.externalAccountId,
+    lastSyncAt: integration.lastSyncAt,
+    lastWebhookAt: integration.lastWebhookAt,
+    lastError: integration.lastError,
   }
 }
