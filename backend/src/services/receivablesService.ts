@@ -96,3 +96,36 @@ export async function listReceivables(
 
   return filters.status ? rows.filter((row) => row.status === filters.status) : rows
 }
+
+export async function receivablesSummary(userId: string) {
+  const rows = await listReceivables(userId)
+  const pending = rows.filter((row) => row.status !== 'paid')
+
+  const invoiceIds = pending.map((row) => row.id)
+  const rates = await prisma.movement.findMany({
+    where: { id: { in: invoiceIds } },
+    select: { id: true, exchangeRate: { select: { value: true } } },
+  })
+  const rateById = new Map(rates.map((r) => [r.id, Number(r.exchangeRate.value)]))
+
+  const byCurrency: Record<string, number> = {}
+  const aging = { '0-30': 0, '31-60': 0, '61+': 0 }
+  let totalArs = 0
+  let overdueArs = 0
+
+  for (const row of pending) {
+    byCurrency[row.currency] = round2((byCurrency[row.currency] ?? 0) + row.outstanding)
+
+    // Se usa el snapshot de la factura: es la cotización a la que se devengó.
+    const ars = round2(row.outstanding * (rateById.get(row.id) ?? 1))
+    totalArs = round2(totalArs + ars)
+
+    if (row.status === 'overdue') {
+      overdueArs = round2(overdueArs + ars)
+      const bucket = row.daysOverdue <= 30 ? '0-30' : row.daysOverdue <= 60 ? '31-60' : '61+'
+      aging[bucket] = round2(aging[bucket] + ars)
+    }
+  }
+
+  return { byCurrency, totalArs, overdueArs, aging }
+}

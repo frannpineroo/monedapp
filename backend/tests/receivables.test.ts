@@ -437,3 +437,42 @@ describe('GET /receivables', () => {
     expect(res.body).toHaveLength(0)
   })
 })
+
+describe('GET /receivables/summary', () => {
+  it('agrupa por moneda y por antigüedad', async () => {
+    const { token, client } = await setupUser()
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 500,
+        currency: 'ARS',
+        dueDate: '2099-01-01',
+        description: 'Al día',
+      })
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 100,
+        currency: 'USD',
+        date: '2026-01-10',
+        dueDate: '2026-02-10',
+        description: 'Vencida hace mucho',
+      })
+
+    const res = await request(app).get('/receivables/summary').set(auth(token))
+
+    expect(res.status).toBe(200)
+    expect(res.body.byCurrency.ARS).toBe(500)
+    expect(res.body.byCurrency.USD).toBe(100)
+    expect(res.body.totalArs).toBeGreaterThan(500)
+    expect(res.body.overdueArs).toBeGreaterThan(0)
+    expect(res.body.aging['61+']).toBeGreaterThan(0)
+  })
+})

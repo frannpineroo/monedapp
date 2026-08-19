@@ -1,10 +1,18 @@
 import { Router } from 'express'
 import { asyncHandler } from '../lib/asyncHandler'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
-import { listReceivables } from '../services/receivablesService'
+import { listReceivables, receivablesSummary } from '../services/receivablesService'
 
 const router = Router()
 router.use(requireAuth)
+
+router.get(
+  '/summary',
+  asyncHandler(async (req, res) => {
+    const { userId } = req as AuthedRequest
+    res.json(await receivablesSummary(userId))
+  })
+)
 
 router.get(
   '/',
