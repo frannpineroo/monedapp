@@ -1,5 +1,5 @@
 import { apiRequest } from '@/src/api/client'
-import type { Client, ExchangeRate, Movement, Wallet } from '@/src/api/types'
+import type { Category, Client, ExchangeRate, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount } from '@/src/lib/format'
 import { colors } from '@/src/theme'
@@ -45,6 +45,19 @@ export default function NewMovementScreen() {
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  const categoryKind = type === 'expense' ? 'EXPENSE' : 'INCOME'
+
+  const categories = useQuery({
+    queryKey: ['categories', categoryKind],
+    queryFn: () =>
+      apiRequest<Category[]>(`/categories?kind=${categoryKind}`, { token: accessToken }),
+    enabled: !!accessToken && type !== 'transfer',
+  })
+
+  const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+
   const selectedWalletId = walletId ?? wallets.data?.[0]?.id ?? null
 
   const [rateType, setRateType] = useState<string | null>(null)
@@ -87,6 +100,24 @@ export default function NewMovementScreen() {
     },
   })
 
+  const createCategory = useMutation({
+    mutationFn: (name: string) =>
+      apiRequest<Category>('/categories', {
+        method: 'POST',
+        token: accessToken,
+        body: { name, kind: categoryKind },
+      }),
+    onSuccess: async (created) => {
+      await queryClient.invalidateQueries({ queryKey: ['categories'] })
+      setCategoryId(created.id)
+      setNewCategoryName('')
+      setShowNewCategory(false)
+    },
+    onError: (e) => {
+      setError(e instanceof Error ? e.message : 'No se pudo crear la categoría')
+    },
+  })
+
   const create = useMutation({
     mutationFn: () =>
       apiRequest<Movement>('/movements', {
@@ -96,6 +127,7 @@ export default function NewMovementScreen() {
           walletId: selectedWalletId,
           toWalletId: type === 'transfer' ? toWalletId : undefined,
           clientId: type === 'income' && clientId ? clientId : undefined,
+          categoryId: type !== 'transfer' ? (categoryId ?? undefined) : undefined,
           type,
           amount: Number(amount),
           description,
@@ -109,6 +141,7 @@ export default function NewMovementScreen() {
       setAmount('')
       setDescription('')
       setClientId(null)
+      setCategoryId(null)
       router.push('/(tabs)/movements')
     },
     onError: (e) => {
@@ -128,6 +161,9 @@ export default function NewMovementScreen() {
       setShowNewClient(false)
       setNewClientName('')
     }
+    setCategoryId(null)
+    setShowNewCategory(false)
+    setNewCategoryName('')
   }
 
   function submit() {
@@ -142,6 +178,10 @@ export default function NewMovementScreen() {
     }
     if (!(Number(amount) > 0)) {
       setError('El monto debe ser mayor a 0')
+      return
+    }
+    if (type !== 'transfer' && !categoryId) {
+      setError('Elegí una categoría')
       return
     }
     if (type === 'transfer' && !toWalletId) {
@@ -159,6 +199,16 @@ export default function NewMovementScreen() {
       return
     }
     createClient.mutate(name)
+  }
+
+  function submitNewCategory() {
+    setError(null)
+    const name = newCategoryName.trim()
+    if (!name) {
+      setError('Escribí el nombre de la categoría')
+      return
+    }
+    createCategory.mutate(name)
   }
 
   return (
@@ -261,6 +311,55 @@ export default function NewMovementScreen() {
                 disabled={createClient.isPending}
               >
                 {createClient.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Agregar</Text>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
+        </>
+      ) : null}
+
+      {type !== 'transfer' ? (
+        <>
+          <Text style={styles.label}>Categoría</Text>
+          <View style={styles.rowWrap}>
+            {(categories.data ?? []).map((c) => (
+              <Pressable
+                key={c.id}
+                style={[styles.chip, categoryId === c.id && styles.chipActive]}
+                onPress={() => setCategoryId(c.id)}
+              >
+                <Text style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>
+                  {c.name}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.chip, showNewCategory && styles.chipActive]}
+              onPress={() => setShowNewCategory((v) => !v)}
+            >
+              <Text style={[styles.chipText, showNewCategory && styles.chipTextActive]}>
+                Nueva categoría
+              </Text>
+            </Pressable>
+          </View>
+          {showNewCategory ? (
+            <View style={styles.newClientRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Nombre de la categoría"
+                placeholderTextColor={colors.muted}
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
+              />
+              <Pressable
+                style={styles.smallButton}
+                onPress={submitNewCategory}
+                disabled={createCategory.isPending}
+              >
+                {createCategory.isPending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.buttonText}>Agregar</Text>
