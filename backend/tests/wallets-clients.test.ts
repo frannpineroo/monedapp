@@ -139,3 +139,53 @@ describe('wallets', () => {
     expect(res.status).toBe(409)
   })
 })
+
+describe('clients', () => {
+  async function createClient(token: string, name: string) {
+    const res = await request(app)
+      .post('/clients')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name })
+    return res.body as { id: string; name: string }
+  }
+
+  it('DELETE /clients/:id sin movimientos → 204', async () => {
+    const { token } = await setupUser()
+    const client = await createClient(token, 'Cliente sin historia')
+
+    const res = await request(app)
+      .delete(`/clients/${client.id}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(204)
+  })
+
+  it('DELETE /clients/:id con un ingreso asociado → 400 y el movimiento conserva el cliente', async () => {
+    const { token, wallets } = await setupUser()
+    const client = await createClient(token, 'Cliente con ingreso')
+    const movement = await createMovement(token, wallets[0].id, { clientId: client.id })
+    expect(movement.status).toBe(201)
+
+    const res = await request(app)
+      .delete(`/clients/${client.id}`)
+      .set('Authorization', `Bearer ${token}`)
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('No se puede borrar un cliente con movimientos')
+
+    const stored = await prisma.movement.findUnique({ where: { id: movement.body.id } })
+    expect(stored!.clientId).toBe(client.id)
+  })
+
+  it('cliente de otro usuario → 404', async () => {
+    const owner = await setupUser()
+    const intruder = await setupUser()
+    const client = await createClient(owner.token, 'Privado')
+
+    const res = await request(app)
+      .delete(`/clients/${client.id}`)
+      .set('Authorization', `Bearer ${intruder.token}`)
+
+    expect(res.status).toBe(404)
+  })
+})

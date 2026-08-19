@@ -98,6 +98,11 @@ router.delete(
     })
     if (!existing) throw new AppError(404, 'Cliente no encontrado')
 
+    const movementCount = await prisma.movement.count({ where: { clientId: existing.id } })
+    if (movementCount > 0) {
+      throw new AppError(400, 'No se puede borrar un cliente con movimientos')
+    }
+
     await prisma.client.delete({ where: { id: existing.id } })
     res.status(204).send()
   })
