@@ -67,12 +67,13 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthedRequest
-    const { walletId, clientId, type, from, to } = req.query
+    const { walletId, clientId, categoryId, type, from, to } = req.query
 
     const where: Prisma.MovementWhereInput = { userId }
 
     if (typeof walletId === 'string') where.walletId = walletId
     if (typeof clientId === 'string') where.clientId = clientId
+    if (typeof categoryId === 'string') where.categoryAccountId = categoryId
     if (typeof type === 'string') where.type = parseMovementType(type)
     if (typeof from === 'string' || typeof to === 'string') {
       where.date = {}

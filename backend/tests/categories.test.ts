@@ -313,3 +313,33 @@ describe('PATCH /movements/:id cambiando categoría', () => {
     expect(entries.reduce((sum, e) => sum + Number(e.change), 0)).toBe(0)
   })
 })
+
+describe('GET /movements?categoryId', () => {
+  it('devuelve solo los movimientos de esa categoría', async () => {
+    const { token, wallets } = await setupUser()
+    const categories = await request(app).get('/categories?kind=EXPENSE').set(auth(token))
+    const [primera, segunda] = categories.body as { id: string }[]
+
+    for (const [categoryId, description] of [
+      [primera.id, 'Gasto A'],
+      [segunda.id, 'Gasto B'],
+    ] as const) {
+      await request(app)
+        .post('/movements')
+        .set(auth(token))
+        .send({
+          walletId: wallets[0].id,
+          type: 'expense',
+          amount: 100,
+          description,
+          categoryId,
+        })
+    }
+
+    const res = await request(app).get(`/movements?categoryId=${segunda.id}`).set(auth(token))
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].description).toBe('Gasto B')
+  })
+})
