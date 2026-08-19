@@ -98,6 +98,15 @@ export default function RootLayout() {
                 headerShadowVisible: false,
               }}
             />
+            <Stack.Screen
+              name="movement/[id]"
+              options={{
+                headerShown: true,
+                title: 'Movimiento',
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+              }}
+            />
           </Stack>
         </AuthGate>
       </AuthProvider>
