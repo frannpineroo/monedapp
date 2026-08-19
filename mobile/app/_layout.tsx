@@ -107,6 +107,15 @@ export default function RootLayout() {
                 headerShadowVisible: false,
               }}
             />
+            <Stack.Screen
+              name="receivables"
+              options={{
+                headerShown: true,
+                title: 'Te deben',
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+              }}
+            />
           </Stack>
         </AuthGate>
       </AuthProvider>

@@ -1,5 +1,5 @@
 import { apiRequest } from '@/src/api/client'
-import type { Movement, WalletBalance } from '@/src/api/types'
+import type { Movement, ReceivablesSummary, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount, groupBalancesByCurrency } from '@/src/lib/format'
 import { colors } from '@/src/theme'
@@ -49,6 +49,13 @@ export default function HomeScreen() {
   })
   const pendingCount = pending.data?.length ?? 0
 
+  const receivables = useQuery({
+    queryKey: ['receivables-summary'],
+    queryFn: () =>
+      apiRequest<ReceivablesSummary>('/receivables/summary', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+
   const month = new Date().toISOString().slice(0, 7)
 
   const byCategory = useQuery({
@@ -71,13 +78,18 @@ export default function HomeScreen() {
   const recentMovements = (movements.data ?? []).slice(0, 5)
 
   const refreshing =
-    balances.isFetching || movements.isFetching || byCategory.isFetching || pending.isFetching
+    balances.isFetching ||
+    movements.isFetching ||
+    byCategory.isFetching ||
+    pending.isFetching ||
+    receivables.isFetching
   const onRefresh = useCallback(() => {
     void balances.refetch()
     void movements.refetch()
     void byCategory.refetch()
     void pending.refetch()
-  }, [balances, movements, byCategory, pending])
+    void receivables.refetch()
+  }, [balances, movements, byCategory, pending, receivables])
 
   const loading = balances.isLoading || movements.isLoading
 
@@ -127,6 +139,18 @@ export default function HomeScreen() {
               ))
             )}
           </View>
+
+          {receivables.data && receivables.data.totalArs > 0 ? (
+            <Pressable style={styles.owedCard} onPress={() => router.push('/receivables')}>
+              <Text style={styles.sectionLabelInline}>Te deben</Text>
+              <Text style={styles.owedTotal}>{formatAmount(receivables.data.totalArs, 'ARS')}</Text>
+              {receivables.data.overdueArs > 0 ? (
+                <Text style={styles.owedOverdue}>
+                  {formatAmount(receivables.data.overdueArs, 'ARS')} vencido
+                </Text>
+              ) : null}
+            </Pressable>
+          ) : null}
 
           <Text style={styles.sectionLabel}>Tus billeteras</Text>
           <ScrollView
@@ -377,4 +401,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   barFill: { height: 8, borderRadius: 999, backgroundColor: colors.accent },
+  owedCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 24,
+    gap: 6,
+  },
+  owedTotal: { fontSize: 24, fontWeight: '700', color: colors.ink },
+  owedOverdue: { color: colors.danger, fontWeight: '600' },
 })
