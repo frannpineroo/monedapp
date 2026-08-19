@@ -60,6 +60,26 @@ const DEFAULT_EXPENSE_CATEGORIES = [
 
 const DEFAULT_INCOME_CATEGORIES = ['Otros ingresos']
 
+export const RECEIVABLES_ACCOUNT_NAME = 'Deudores por ventas'
+export const FX_DIFFERENCE_ACCOUNT_NAME = 'Diferencia de cambio'
+
+/** Idempotente: la corre el onboarding y también la primera factura de un usuario viejo. */
+export async function ensureSystemAccounts(userId: string) {
+  const receivables = await prisma.account.upsert({
+    where: { userId_name: { userId, name: RECEIVABLES_ACCOUNT_NAME } },
+    create: { userId, name: RECEIVABLES_ACCOUNT_NAME, kind: AccountKind.ASSET, currency: null },
+    update: {},
+  })
+
+  const fxDifference = await prisma.account.upsert({
+    where: { userId_name: { userId, name: FX_DIFFERENCE_ACCOUNT_NAME } },
+    create: { userId, name: FX_DIFFERENCE_ACCOUNT_NAME, kind: AccountKind.INCOME, currency: null },
+    update: {},
+  })
+
+  return { receivablesAccountId: receivables.id, fxDifferenceAccountId: fxDifference.id }
+}
+
 /** Idempotente: se puede llamar en el onboarding y de nuevo desde la app. */
 export async function ensureDefaultCategories(userId: string) {
   const seeds = [
@@ -128,6 +148,7 @@ export async function applyOnboarding(userId: string, templateId: string) {
   })
 
   await ensureDefaultCategories(userId)
+  await ensureSystemAccounts(userId)
 
   return prisma.user.findUniqueOrThrow({ where: { id: userId } })
 }

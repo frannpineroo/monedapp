@@ -6,13 +6,13 @@ import { AppError } from '../lib/errors'
 import { paramId } from '../lib/params'
 import { serializeCategory } from '../lib/serializers'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
-import { ensureDefaultCategories } from '../services/onboardingService'
+import { ensureDefaultCategories, FX_DIFFERENCE_ACCOUNT_NAME, RECEIVABLES_ACCOUNT_NAME } from '../services/onboardingService'
 
 const router = Router()
 router.use(requireAuth)
 
 /** Cuentas internas que el usuario no maneja como categoría. */
-export const SYSTEM_CATEGORY_NAMES = ['Deudores por ventas', 'Diferencia de cambio']
+export const SYSTEM_CATEGORY_NAMES = [RECEIVABLES_ACCOUNT_NAME, FX_DIFFERENCE_ACCOUNT_NAME]
 
 const CATEGORY_KINDS = [AccountKind.EXPENSE, AccountKind.INCOME]
 

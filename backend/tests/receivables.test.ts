@@ -77,3 +77,25 @@ describe('schema de cobrables', () => {
     expect(entries.every((e) => e.changeArs !== null)).toBe(true)
   })
 })
+
+describe('cuentas de sistema', () => {
+  it('el onboarding las crea y llamarlas de nuevo no duplica', async () => {
+    const { ensureSystemAccounts } = await import('../src/services/onboardingService')
+    const { client } = await setupUser()
+    const user = await prisma.user.findFirstOrThrow({
+      where: { clients: { some: { id: client.id } } },
+    })
+
+    const first = await ensureSystemAccounts(user.id)
+    const second = await ensureSystemAccounts(user.id)
+
+    expect(second).toEqual(first)
+
+    const accounts = await prisma.account.findMany({
+      where: { userId: user.id, name: { in: ['Deudores por ventas', 'Diferencia de cambio'] } },
+    })
+    expect(accounts).toHaveLength(2)
+    expect(accounts.find((a) => a.name === 'Deudores por ventas')?.kind).toBe('ASSET')
+    expect(accounts.find((a) => a.name === 'Diferencia de cambio')?.kind).toBe('INCOME')
+  })
+})
