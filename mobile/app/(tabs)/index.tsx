@@ -39,6 +39,14 @@ export default function HomeScreen() {
     enabled: !!accessToken,
   })
 
+  const pending = useQuery({
+    queryKey: ['movements', { needsReview: true }],
+    queryFn: () =>
+      apiRequest<Movement[]>('/movements?needsReview=true', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+  const pendingCount = pending.data?.length ?? 0
+
   const month = new Date().toISOString().slice(0, 7)
 
   const byCategory = useQuery({
@@ -60,12 +68,14 @@ export default function HomeScreen() {
   const currencyEntries = Object.entries(totalsByCurrency)
   const recentMovements = (movements.data ?? []).slice(0, 5)
 
-  const refreshing = balances.isFetching || movements.isFetching || byCategory.isFetching
+  const refreshing =
+    balances.isFetching || movements.isFetching || byCategory.isFetching || pending.isFetching
   const onRefresh = useCallback(() => {
     void balances.refetch()
     void movements.refetch()
     void byCategory.refetch()
-  }, [balances, movements, byCategory])
+    void pending.refetch()
+  }, [balances, movements, byCategory, pending])
 
   const loading = balances.isLoading || movements.isLoading
 
@@ -89,6 +99,14 @@ export default function HomeScreen() {
         <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
       ) : (
         <>
+          {pendingCount > 0 ? (
+            <Pressable style={styles.banner} onPress={() => router.push('/(tabs)/inbox')}>
+              <Text style={styles.bannerText}>
+                Tenés {pendingCount} movimiento{pendingCount === 1 ? '' : 's'} para revisar
+              </Text>
+            </Pressable>
+          ) : null}
+
           <Text style={styles.sectionLabel}>Tu plata</Text>
           <View style={styles.hero}>
             {currencyEntries.length === 0 ? (
@@ -246,6 +264,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  banner: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  bannerText: { color: colors.accent, fontWeight: '600' },
   hero: {
     backgroundColor: colors.surface,
     borderRadius: 20,

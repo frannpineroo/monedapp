@@ -1,5 +1,9 @@
+import { apiRequest } from '@/src/api/client'
+import type { Movement } from '@/src/api/types'
+import { useAuth } from '@/src/auth/AuthContext'
 import { colors } from '@/src/theme'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { useQuery } from '@tanstack/react-query'
 import { Tabs } from 'expo-router'
 
 function TabIcon(props: {
@@ -10,6 +14,14 @@ function TabIcon(props: {
 }
 
 export default function TabLayout() {
+  const { accessToken } = useAuth()
+  const pending = useQuery({
+    queryKey: ['movements', { needsReview: true }],
+    queryFn: () => apiRequest<Movement[]>('/movements?needsReview=true', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+  const pendingCount = pending.data?.length ?? 0
+
   return (
     <Tabs
       screenOptions={{
@@ -39,6 +51,14 @@ export default function TabLayout() {
         options={{
           title: 'Nuevo',
           tabBarIcon: ({ color }) => <TabIcon name="plus-circle" color={String(color)} />,
+        }}
+      />
+      <Tabs.Screen
+        name="inbox"
+        options={{
+          title: 'Revisar',
+          tabBarIcon: ({ color }) => <TabIcon name="inbox" color={String(color)} />,
+          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
         }}
       />
       <Tabs.Screen
