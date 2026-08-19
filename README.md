@@ -80,6 +80,8 @@ npx expo start
 | CRUD | `/movements` | Genera partida doble oculta |
 | GET | `/reports/balance-by-wallet` | Saldos por billetera |
 | GET | `/exchange-rates?currency=USD&date=YYYY-MM-DD` | Cotización real (oficial/blue/mep/cripto) con caché y fallback |
+| DELETE | `/wallets/:id` | 400 si la billetera tiene movimientos |
+| DELETE | `/clients/:id` | 400 si el cliente tiene movimientos |
 
 ## Fuera de este core
 
