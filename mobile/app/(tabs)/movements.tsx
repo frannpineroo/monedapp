@@ -1,5 +1,5 @@
 import { apiRequest } from '@/src/api/client'
-import type { Movement, Wallet } from '@/src/api/types'
+import type { Category, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount } from '@/src/lib/format'
 import { colors } from '@/src/theme'
@@ -27,6 +27,7 @@ export default function MovementsScreen() {
   const { accessToken } = useAuth()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [walletFilter, setWalletFilter] = useState<string | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
   const wallets = useQuery({
     queryKey: ['wallets'],
@@ -34,12 +35,19 @@ export default function MovementsScreen() {
     enabled: !!accessToken,
   })
 
+  const categories = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => apiRequest<Category[]>('/categories', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+
   const movements = useQuery({
-    queryKey: ['movements', { type: typeFilter, walletId: walletFilter }],
+    queryKey: ['movements', { type: typeFilter, walletId: walletFilter, categoryId: categoryFilter }],
     queryFn: () => {
       const params = new URLSearchParams()
       if (typeFilter !== 'all') params.set('type', typeFilter)
       if (walletFilter) params.set('walletId', walletFilter)
+      if (categoryFilter) params.set('categoryId', categoryFilter)
       const qs = params.toString()
       return apiRequest<Movement[]>(`/movements${qs ? `?${qs}` : ''}`, {
         token: accessToken,
@@ -48,7 +56,7 @@ export default function MovementsScreen() {
     enabled: !!accessToken,
   })
 
-  const hasFilters = typeFilter !== 'all' || walletFilter !== null
+  const hasFilters = typeFilter !== 'all' || walletFilter !== null || categoryFilter !== null
 
   return (
     <View style={styles.container}>
@@ -97,6 +105,29 @@ export default function MovementsScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Text style={[styles.filterLabel, { marginTop: 10 }]}>Categoría</Text>
+        <View style={styles.chipRow}>
+          <Pressable
+            style={[styles.chip, categoryFilter === null && styles.chipActive]}
+            onPress={() => setCategoryFilter(null)}
+          >
+            <Text style={[styles.chipText, categoryFilter === null && styles.chipTextActive]}>
+              Todas
+            </Text>
+          </Pressable>
+          {(categories.data ?? []).map((c) => (
+            <Pressable
+              key={c.id}
+              style={[styles.chip, categoryFilter === c.id && styles.chipActive]}
+              onPress={() => setCategoryFilter(c.id)}
+            >
+              <Text style={[styles.chipText, categoryFilter === c.id && styles.chipTextActive]}>
+                {c.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       {movements.isLoading ? (
@@ -129,6 +160,7 @@ export default function MovementsScreen() {
                   ? colors.income
                   : colors.ink
             const clientSuffix = item.client?.name ? ` · ${item.client.name}` : ''
+            const categorySuffix = item.category?.name ? ` · ${item.category.name}` : ''
             const rate = item.currency !== 'ARS' ? item.exchangeRate : undefined
             const rateLabel = rate
               ? `${rate.type} ${Number(rate.sell ?? rate.value).toLocaleString('es-AR', {
@@ -141,6 +173,7 @@ export default function MovementsScreen() {
                   <Text style={styles.desc}>{item.description}</Text>
                   <Text style={styles.meta}>
                     {typeLabel[item.type]} · {item.wallet?.name ?? item.currency}
+                    {categorySuffix}
                     {clientSuffix}
                   </Text>
                   {rateLabel ? <Text style={styles.meta}>{rateLabel}</Text> : null}
