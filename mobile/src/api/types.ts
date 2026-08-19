@@ -35,6 +35,7 @@ export type WalletBalance = {
 export type Client = {
   id: string
   name: string
+  phone: string | null
   defaultCurrency: string
   createdAt: string
   updatedAt: string
