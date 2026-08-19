@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app'
 import { httpClient } from '../src/lib/httpClient'
 import { prisma } from '../src/prisma/prisma'
-import { fakeMpFetch, tokenResponse } from './helpers/mpFixtures'
+import { fakeMpFetch, tokenResponse, approvedPayment, pendingPayment } from './helpers/mpFixtures'
 
 const app = createApp()
 
@@ -179,5 +179,59 @@ describe('rutas de integraciones', () => {
       .send({ mobileRedirectUri: 'monedapp://integrations/stripe' })
 
     expect(res.status).toBe(400)
+  })
+})
+
+describe('ingestPayment', () => {
+  it('un pago aprobado crea ingreso bruto + comisión y el asiento suma 0', async () => {
+    const { ingestPayment } = await import('../src/services/mercadopago/mpIngestionService')
+    const { userId } = await registerAndOnboard()
+
+    const result = await ingestPayment(userId, approvedPayment({ id: 200000001 }))
+
+    expect(result.status).toBe('posted')
+
+    const movements = await prisma.movement.findMany({
+      where: { userId, externalProvider: 'mercadopago' },
+      orderBy: { externalId: 'asc' },
+    })
+    expect(movements).toHaveLength(2)
+    expect(movements.map((m) => m.externalId)).toEqual(['200000001', '200000001:fee'])
+    expect(movements[0].needsReview).toBe(true)
+    expect(movements[1].needsReview).toBe(false)
+    expect(movements[0].date.toISOString()).toBe('2026-08-14T00:00:00.000Z')
+
+    const feeCategory = await prisma.account.findUnique({
+      where: { id: movements[1].categoryAccountId! },
+    })
+    expect(feeCategory?.name).toBe('Comisiones bancarias')
+
+    const entries = await prisma.ledgerEntry.findMany({
+      where: { movementId: { in: movements.map((m) => m.id) } },
+    })
+    expect(entries.reduce((sum, e) => sum + Number(e.change), 0)).toBe(0)
+  })
+
+  it('reingestar el mismo pago no duplica nada', async () => {
+    const { ingestPayment } = await import('../src/services/mercadopago/mpIngestionService')
+    const { userId } = await registerAndOnboard()
+
+    await ingestPayment(userId, approvedPayment({ id: 200000002 }))
+    await ingestPayment(userId, approvedPayment({ id: 200000002 }))
+
+    const count = await prisma.movement.count({
+      where: { userId, externalProvider: 'mercadopago' },
+    })
+    expect(count).toBe(2)
+  })
+
+  it('un pago pendiente no crea movimientos', async () => {
+    const { ingestPayment } = await import('../src/services/mercadopago/mpIngestionService')
+    const { userId } = await registerAndOnboard()
+
+    const result = await ingestPayment(userId, pendingPayment({ id: 200000003 }))
+
+    expect(result.status).toBe('skipped')
+    expect(await prisma.movement.count({ where: { userId, externalProvider: 'mercadopago' } })).toBe(0)
   })
 })
