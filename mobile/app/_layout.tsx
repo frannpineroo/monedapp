@@ -1,4 +1,5 @@
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext'
+import { colors } from '@/src/theme'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
@@ -61,6 +62,24 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="wallets"
+              options={{
+                headerShown: true,
+                title: 'Billeteras',
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="clients"
+              options={{
+                headerShown: true,
+                title: 'Clientes',
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+              }}
+            />
           </Stack>
         </AuthGate>
       </AuthProvider>
