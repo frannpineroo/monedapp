@@ -14,6 +14,7 @@ export function serializeClient(client: Client) {
   return {
     id: client.id,
     name: client.name,
+    phone: client.phone,
     defaultCurrency: client.defaultCurrency,
     createdAt: client.createdAt,
     updatedAt: client.updatedAt,

@@ -188,4 +188,25 @@ describe('clients', () => {
 
     expect(res.status).toBe(404)
   })
+
+  it('POST /clients guarda el teléfono y PATCH lo actualiza', async () => {
+    const { token } = await setupUser()
+
+    const created = await request(app)
+      .post('/clients')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Estudio Contable', phone: '+5491122334455', defaultCurrency: 'USD' })
+
+    expect(created.status).toBe(201)
+    expect(created.body.phone).toBe('+5491122334455')
+    expect(created.body.defaultCurrency).toBe('USD')
+
+    const patched = await request(app)
+      .patch(`/clients/${created.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ phone: '' })
+
+    expect(patched.status).toBe(200)
+    expect(patched.body.phone).toBeNull()
+  })
 })

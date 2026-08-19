@@ -18,6 +18,16 @@ function parseCurrency(value: unknown, fallback: Currency = Currency.ARS): Curre
   return value as Currency
 }
 
+/** '' y null limpian el campo; cualquier otro tipo es un error del cliente. */
+function parsePhone(value: unknown): string | null {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'El teléfono es inválido')
+  }
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {
@@ -34,8 +44,9 @@ router.post(
   '/',
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthedRequest
-    const { name, defaultCurrency } = req.body as {
+    const { name, phone, defaultCurrency } = req.body as {
       name?: unknown
+      phone?: unknown
       defaultCurrency?: unknown
     }
 
@@ -47,6 +58,7 @@ router.post(
       data: {
         userId,
         name: name.trim(),
+        phone: parsePhone(phone),
         defaultCurrency: parseCurrency(defaultCurrency),
       },
     })
@@ -64,17 +76,21 @@ router.patch(
     })
     if (!existing) throw new AppError(404, 'Cliente no encontrado')
 
-    const { name, defaultCurrency } = req.body as {
+    const { name, phone, defaultCurrency } = req.body as {
       name?: unknown
+      phone?: unknown
       defaultCurrency?: unknown
     }
 
-    const data: { name?: string; defaultCurrency?: Currency } = {}
+    const data: { name?: string; phone?: string | null; defaultCurrency?: Currency } = {}
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim() === '') {
         throw new AppError(400, 'El nombre es inválido')
       }
       data.name = name.trim()
+    }
+    if (phone !== undefined) {
+      data.phone = parsePhone(phone)
     }
     if (defaultCurrency !== undefined) {
       data.defaultCurrency = parseCurrency(defaultCurrency)
