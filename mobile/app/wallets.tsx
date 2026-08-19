@@ -1,22 +1,90 @@
-import { apiRequest } from '@/src/api/client'
-import type { WalletBalance } from '@/src/api/types'
+import { ApiError, apiRequest } from '@/src/api/client'
+import type { Wallet, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount } from '@/src/lib/format'
 import { colors } from '@/src/theme'
 import { formStyles } from '@/src/ui/formStyles'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 
 export default function WalletsScreen() {
   const { accessToken } = useAuth()
+  const queryClient = useQueryClient()
+  const [editing, setEditing] = useState<Wallet | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [name, setName] = useState('')
+  const [currency, setCurrency] = useState('ARS')
+  const [error, setError] = useState<string | null>(null)
+
+  const open = Boolean(editing) || creating
+
+  function openCreate() {
+    setEditing(null)
+    setCreating(true)
+    setName('')
+    setCurrency('ARS')
+    setError(null)
+  }
+
+  function openEdit(wallet: Wallet) {
+    setCreating(false)
+    setEditing(wallet)
+    setName(wallet.name)
+    setCurrency(wallet.currency)
+    setError(null)
+  }
+
+  function close() {
+    setCreating(false)
+    setEditing(null)
+    setError(null)
+  }
+
+  async function refresh() {
+    await queryClient.invalidateQueries({ queryKey: ['wallets'] })
+    await queryClient.invalidateQueries({ queryKey: ['balance-by-wallet'] })
+  }
+
+  const save = useMutation({
+    mutationFn: () =>
+      editing
+        ? apiRequest<Wallet>(`/wallets/${editing.id}`, {
+            method: 'PATCH',
+            token: accessToken,
+            body: { name: name.trim() },
+          })
+        : apiRequest<Wallet>('/wallets', {
+            method: 'POST',
+            token: accessToken,
+            body: { name: name.trim(), currency },
+          }),
+    onSuccess: async () => {
+      await refresh()
+      close()
+    },
+    // El backend ya manda el mensaje en castellano (409 = nombre repetido).
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo guardar'),
+  })
+
+  function submit() {
+    setError(null)
+    if (!name.trim()) {
+      setError('Escribí un nombre')
+      return
+    }
+    save.mutate()
+  }
 
   const balances = useQuery({
     queryKey: ['balance-by-wallet'],
@@ -44,7 +112,7 @@ export default function WalletsScreen() {
             <Text style={styles.empty}>Todavía no tenés billeteras.</Text>
           }
           renderItem={({ item }) => (
-            <Pressable style={styles.row}>
+            <Pressable style={styles.row} onPress={() => openEdit(item.wallet)}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.wallet.name}</Text>
                 <Text style={styles.meta}>{item.currency}</Text>
@@ -56,10 +124,68 @@ export default function WalletsScreen() {
       )}
 
       <View style={styles.footer}>
-        <Pressable style={formStyles.button}>
+        <Pressable style={formStyles.button} onPress={openCreate}>
           <Text style={formStyles.buttonText}>Nueva billetera</Text>
         </Pressable>
       </View>
+
+      <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
+        <View style={styles.backdrop}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>
+              {editing ? 'Editar billetera' : 'Nueva billetera'}
+            </Text>
+
+            <Text style={formStyles.label}>Nombre</Text>
+            <TextInput
+              style={formStyles.input}
+              placeholder="Ej. Mercado Pago"
+              placeholderTextColor={colors.muted}
+              value={name}
+              onChangeText={setName}
+            />
+
+            {editing ? (
+              <Text style={styles.note}>La moneda ({editing.currency}) no se puede cambiar.</Text>
+            ) : (
+              <>
+                <Text style={formStyles.label}>Moneda</Text>
+                <View style={formStyles.rowWrap}>
+                  {['ARS', 'USD', 'USDT'].map((c) => (
+                    <Pressable
+                      key={c}
+                      style={[formStyles.chip, currency === c && formStyles.chipActive]}
+                      onPress={() => setCurrency(c)}
+                    >
+                      <Text
+                        style={[
+                          formStyles.chipText,
+                          currency === c && formStyles.chipTextActive,
+                        ]}
+                      >
+                        {c}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {error ? <Text style={formStyles.error}>{error}</Text> : null}
+
+            <Pressable style={formStyles.button} onPress={submit} disabled={save.isPending}>
+              {save.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={formStyles.buttonText}>Guardar</Text>
+              )}
+            </Pressable>
+            <Pressable onPress={close}>
+              <Text style={styles.cancel}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -86,4 +212,15 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.bg,
   },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    gap: 12,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  note: { fontSize: 13, color: colors.muted },
+  cancel: { color: colors.muted, textAlign: 'center', paddingVertical: 8 },
 })
