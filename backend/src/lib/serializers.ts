@@ -31,7 +31,7 @@ export function serializeCategory(account: Account) {
 
 export function serializeMovement(
   movement: Movement & {
-    wallet?: { id: string; name: string; currency: string }
+    wallet?: { id: string; name: string; currency: string } | null
     client?: { id: string; name: string } | null
     categoryAccount?: { id: string; name: string } | null
     exchangeRate?: {

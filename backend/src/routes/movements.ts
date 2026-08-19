@@ -258,6 +258,7 @@ router.patch(
     }
 
     if (categoryId !== undefined) {
+      if (!existing.wallet) throw new AppError(400, 'El movimiento no tiene billetera')
       const categoryAccountId = await resolveCategoryAccountId(userId, existing.type, categoryId)
 
       const movement = await prisma.$transaction(async (tx) => {

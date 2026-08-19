@@ -23,6 +23,8 @@ enum MovementType {
   income
   expense
   transfer
+  invoice
+  collection
 }
 
 enum ExchangeRateType {
@@ -140,7 +142,7 @@ model ExchangeRate {
 model Movement {
   id             String       @id @default(cuid())
   userId         String
-  walletId       String
+  walletId       String?
   clientId       String?
   categoryAccountId String?
   toWalletId     String?
@@ -150,15 +152,19 @@ model Movement {
   exchangeRateId String
   description    String
   date           DateTime     @db.Date
+  dueDate        DateTime?    @db.Date
+  invoiceId      String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet       Wallet        @relation(fields: [walletId], references: [id])
+  wallet       Wallet?       @relation(fields: [walletId], references: [id])
   client       Client?       @relation(fields: [clientId], references: [id])
   categoryAccount Account? @relation("MovementCategory", fields: [categoryAccountId], references: [id], onDelete: Restrict)
   exchangeRate ExchangeRate  @relation(fields: [exchangeRateId], references: [id])
   ledgerEntries LedgerEntry[]
+  invoice      Movement?     @relation("InvoiceCollections", fields: [invoiceId], references: [id])
+  collections  Movement[]    @relation("InvoiceCollections")
 
   externalProvider  String?
   externalId        String?
@@ -172,6 +178,7 @@ model Movement {
   @@index([walletId])
   @@index([clientId])
   @@index([categoryAccountId])
+  @@index([invoiceId])
   @@index([date])
   @@map("movements")
 }
@@ -181,6 +188,7 @@ model LedgerEntry {
   movementId String
   accountId  String
   change     Decimal  @db.Decimal(18, 2)
+  changeArs  Decimal  @db.Decimal(18, 2)
   currency   Currency
   createdAt  DateTime @default(now())
 
