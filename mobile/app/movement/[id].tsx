@@ -6,6 +6,7 @@ import { colors } from '@/src/theme'
 import { formStyles } from '@/src/ui/formStyles'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as Linking from 'expo-linking'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 
@@ -99,6 +100,19 @@ export default function MovementDetailScreen() {
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo registrar el cobro'),
   })
+
+  function remindOnWhatsApp() {
+    const row = receivable.data
+    if (!row) return
+
+    const monto = formatAmount(row.outstanding, row.currency)
+    const atraso = row.daysOverdue > 0 ? ` (${row.daysOverdue} días de atraso)` : ''
+    const mensaje = `Hola ${row.client?.name ?? ''}, te paso el recordatorio de la factura "${row.description}": queda pendiente ${monto}${atraso}. ¡Gracias!`
+
+    // Sin teléfono, wa.me sin número deja elegir el contacto en la app.
+    const phone = (row.client?.phone ?? '').replace(/[^\d]/g, '')
+    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}`)
+  }
 
   if (movement.isLoading || !movement.data) {
     return <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
@@ -219,6 +233,10 @@ export default function MovementDetailScreen() {
                   <Text style={formStyles.buttonText}>Registrar cobro</Text>
                 )}
               </Pressable>
+
+              <Pressable onPress={remindOnWhatsApp}>
+                <Text style={styles.remind}>Recordar por WhatsApp</Text>
+              </Pressable>
             </>
           ) : null}
         </>
@@ -241,4 +259,5 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   amount: { fontSize: 28, fontWeight: '700', color: colors.ink },
   meta: { fontSize: 13, color: colors.muted },
+  remind: { color: colors.accent, textAlign: 'center', paddingVertical: 10, fontWeight: '600' },
 })
