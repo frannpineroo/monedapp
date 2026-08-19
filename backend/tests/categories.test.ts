@@ -102,3 +102,39 @@ describe('GET /categories', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('POST /categories', () => {
+  it('crea una categoría de gasto', async () => {
+    const { token } = await setupUser()
+
+    const res = await request(app)
+      .post('/categories')
+      .set(auth(token))
+      .send({ name: 'Publicidad', kind: 'EXPENSE' })
+
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ id: expect.any(String), name: 'Publicidad', kind: 'EXPENSE' })
+  })
+
+  it('nombre repetido → 409', async () => {
+    const { token } = await setupUser()
+    await request(app).post('/categories').set(auth(token)).send({ name: 'Publicidad', kind: 'EXPENSE' })
+
+    const res = await request(app)
+      .post('/categories')
+      .set(auth(token))
+      .send({ name: 'Publicidad', kind: 'EXPENSE' })
+
+    expect(res.status).toBe(409)
+  })
+
+  it('POST /categories/defaults es idempotente', async () => {
+    const { token } = await setupUser()
+
+    const first = await request(app).post('/categories/defaults').set(auth(token))
+    const second = await request(app).post('/categories/defaults').set(auth(token))
+
+    expect(first.status).toBe(200)
+    expect(second.body).toHaveLength(first.body.length)
+  })
+})
