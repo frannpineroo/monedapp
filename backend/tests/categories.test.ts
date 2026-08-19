@@ -46,3 +46,26 @@ describe('movimientos con categoría', () => {
     expect(stored!.categoryAccountId).toBeNull()
   })
 })
+
+describe('categorías del onboarding', () => {
+  it('deja al menos 6 categorías de gasto y 2 de ingreso', async () => {
+    const { token } = await setupUser()
+    const me = await request(app).get('/wallets').set(auth(token))
+    expect(me.status).toBe(200)
+
+    const user = await prisma.user.findFirstOrThrow({
+      where: { wallets: { some: { id: (me.body as { id: string }[])[0].id } } },
+    })
+
+    const expense = await prisma.account.count({ where: { userId: user.id, kind: 'EXPENSE' } })
+    const income = await prisma.account.count({ where: { userId: user.id, kind: 'INCOME' } })
+
+    expect(expense).toBeGreaterThanOrEqual(6)
+    expect(income).toBeGreaterThanOrEqual(2)
+
+    const operativos = await prisma.account.findFirst({
+      where: { userId: user.id, name: 'Gastos operativos' },
+    })
+    expect(operativos).not.toBeNull()
+  })
+})

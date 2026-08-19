@@ -49,6 +49,38 @@ function accountsForTemplate(templateId: string): AccountSeed[] {
   throw new AppError(400, 'Plantilla desconocida')
 }
 
+const DEFAULT_EXPENSE_CATEGORIES = [
+  'Herramientas y software',
+  'Internet y teléfono',
+  'Equipamiento',
+  'Impuestos y tasas',
+  'Comisiones bancarias',
+  'Otros gastos',
+]
+
+const DEFAULT_INCOME_CATEGORIES = ['Otros ingresos']
+
+/** Idempotente: se puede llamar en el onboarding y de nuevo desde la app. */
+export async function ensureDefaultCategories(userId: string) {
+  const seeds = [
+    ...DEFAULT_EXPENSE_CATEGORIES.map((name) => ({ name, kind: AccountKind.EXPENSE })),
+    ...DEFAULT_INCOME_CATEGORIES.map((name) => ({ name, kind: AccountKind.INCOME })),
+  ]
+
+  for (const seed of seeds) {
+    await prisma.account.upsert({
+      where: { userId_name: { userId, name: seed.name } },
+      create: { userId, name: seed.name, kind: seed.kind, currency: null },
+      update: {},
+    })
+  }
+
+  return prisma.account.findMany({
+    where: { userId, kind: { in: [AccountKind.EXPENSE, AccountKind.INCOME] } },
+    orderBy: { name: 'asc' },
+  })
+}
+
 export function listProfileTemplates(): ProfileTemplate[] {
   return TEMPLATES
 }
@@ -94,6 +126,8 @@ export async function applyOnboarding(userId: string, templateId: string) {
       }
     }
   })
+
+  await ensureDefaultCategories(userId)
 
   return prisma.user.findUniqueOrThrow({ where: { id: userId } })
 }
