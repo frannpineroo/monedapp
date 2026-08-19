@@ -350,3 +350,90 @@ describe('DELETE /movements/:id de facturas', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('GET /receivables', () => {
+  it('refleja pendiente, parcial y cobrada', async () => {
+    const { token, client, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const invoice = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 1000,
+        currency: 'USD',
+        dueDate: '2099-01-01',
+        description: 'Sprint 12',
+      })
+
+    const pending = await request(app).get('/receivables').set(auth(token))
+    expect(pending.status).toBe(200)
+    expect(pending.body[0]).toMatchObject({
+      id: invoice.body.id,
+      outstanding: 1000,
+      collected: 0,
+      status: 'pending',
+    })
+    expect(pending.body[0].client.name).toBe('Estudio Contable')
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.body.id, walletId: usd.id, amount: 400 })
+
+    const partial = await request(app).get('/receivables').set(auth(token))
+    expect(partial.body[0]).toMatchObject({ outstanding: 600, collected: 400, status: 'partial' })
+    expect(partial.body[0].collections).toHaveLength(1)
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.body.id, walletId: usd.id, amount: 600 })
+
+    const paid = await request(app).get('/receivables').set(auth(token))
+    expect(paid.body[0]).toMatchObject({ outstanding: 0, status: 'paid' })
+  })
+
+  it('una factura vencida e impaga trae daysOverdue > 0', async () => {
+    const { token, client } = await setupUser()
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 500,
+        currency: 'ARS',
+        date: '2026-01-10',
+        dueDate: '2026-02-10',
+        description: 'Vieja',
+      })
+
+    const res = await request(app).get('/receivables?status=overdue').set(auth(token))
+
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].status).toBe('overdue')
+    expect(res.body[0].daysOverdue).toBeGreaterThan(0)
+  })
+
+  it('filtra por cliente', async () => {
+    const { token, client } = await setupUser()
+    const otro = await request(app).post('/clients').set(auth(token)).send({ name: 'Otro' })
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 100,
+        currency: 'ARS',
+        dueDate: '2099-01-01',
+        description: 'A',
+      })
+
+    const res = await request(app).get(`/receivables?clientId=${otro.body.id}`).set(auth(token))
+
+    expect(res.body).toHaveLength(0)
+  })
+})
