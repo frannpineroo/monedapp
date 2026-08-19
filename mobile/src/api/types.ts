@@ -68,8 +68,22 @@ export type Movement = {
   currency: string
   description: string
   date: string
+  needsReview?: boolean
+  source?: string
   wallet?: { id: string; name: string; currency: string }
   client?: { id: string; name: string } | null
   category?: { id: string; name: string } | null
   exchangeRate?: ExchangeRate
 }
+
+export type Integration = {
+  provider: string
+  status: 'connected' | 'disconnected' | 'error'
+  externalAccountId: string | null
+  lastSyncAt: string | null
+  lastWebhookAt: string | null
+  lastError: string | null
+}
+
+export type ConnectResponse = { authorizationUrl: string }
+export type SyncResult = { scanned: number; created: number }

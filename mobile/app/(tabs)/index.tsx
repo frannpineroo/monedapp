@@ -80,6 +80,9 @@ export default function HomeScreen() {
           <Text style={styles.hello}>Hola</Text>
           <Text style={styles.email}>{user?.email}</Text>
         </View>
+        <Pressable onPress={() => router.push('/integrations')}>
+          <Text style={styles.seeAll}>Integraciones</Text>
+        </Pressable>
       </View>
 
       {loading ? (

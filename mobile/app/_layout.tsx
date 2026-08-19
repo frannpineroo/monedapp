@@ -89,6 +89,15 @@ export default function RootLayout() {
                 headerShadowVisible: false,
               }}
             />
+            <Stack.Screen
+              name="integrations"
+              options={{
+                headerShown: true,
+                title: 'Integraciones',
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+              }}
+            />
           </Stack>
         </AuthGate>
       </AuthProvider>
