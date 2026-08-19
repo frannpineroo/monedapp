@@ -64,3 +64,40 @@ describe('schema de integraciones', () => {
     await expect(prisma.movement.create({ data: base })).rejects.toMatchObject({ code: 'P2002' })
   })
 })
+
+describe('ensureProviderWallet', () => {
+  it('llamarla dos veces deja una sola billetera', async () => {
+    const { ensureProviderWallet } = await import('../src/services/integrationWalletService')
+    const { userId } = await registerAndOnboard()
+
+    const first = await prisma.$transaction((tx) =>
+      ensureProviderWallet(tx, userId, 'mercadopago', 'ARS')
+    )
+    const second = await prisma.$transaction((tx) =>
+      ensureProviderWallet(tx, userId, 'mercadopago', 'ARS')
+    )
+
+    expect(second.id).toBe(first.id)
+    expect(first.name).toBe('Mercado Pago ARS')
+
+    const count = await prisma.wallet.count({
+      where: { userId, externalProvider: 'mercadopago', currency: 'ARS' },
+    })
+    expect(count).toBe(1)
+  })
+
+  it('si el nombre ya lo usa una cuenta manual, usa el nombre alternativo', async () => {
+    const { ensureProviderWallet } = await import('../src/services/integrationWalletService')
+    const { userId } = await registerAndOnboard()
+
+    await prisma.account.create({
+      data: { userId, name: 'Mercado Pago ARS', kind: 'ASSET', currency: 'ARS' },
+    })
+
+    const wallet = await prisma.$transaction((tx) =>
+      ensureProviderWallet(tx, userId, 'mercadopago', 'ARS')
+    )
+
+    expect(wallet.name).toBe('Mercado Pago ARS (integración)')
+  })
+})
