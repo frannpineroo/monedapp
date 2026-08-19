@@ -57,6 +57,7 @@ export function serializeMovement(
     description: movement.description,
     date: movement.date,
     dueDate: movement.dueDate,
+    invoiceId: movement.invoiceId,
     createdAt: movement.createdAt,
     updatedAt: movement.updatedAt,
     needsReview: movement.needsReview,

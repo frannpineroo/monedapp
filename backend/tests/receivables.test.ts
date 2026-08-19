@@ -476,3 +476,32 @@ describe('GET /receivables/summary', () => {
     expect(res.body.aging['61+']).toBeGreaterThan(0)
   })
 })
+
+describe('serializeMovement con cobrables', () => {
+  it('la factura y el cobro exponen dueDate e invoiceId', async () => {
+    const { token, client, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const invoice = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 1000,
+        currency: 'USD',
+        dueDate: '2026-09-14',
+        description: 'Sprint 12',
+      })
+    const collection = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.body.id, walletId: usd.id, amount: 400 })
+
+    expect(invoice.body.dueDate).toContain('2026-09-14')
+    expect(invoice.body.invoiceId).toBeNull()
+    expect(collection.body.invoiceId).toBe(invoice.body.id)
+
+    const list = await request(app).get('/movements?type=invoice').set(auth(token))
+    expect(list.body[0].dueDate).toContain('2026-09-14')
+  })
+})
