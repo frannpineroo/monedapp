@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -76,6 +77,24 @@ export default function WalletsScreen() {
     // El backend ya manda el mensaje en castellano (409 = nombre repetido).
     onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo guardar'),
   })
+
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest<void>(`/wallets/${id}`, { method: 'DELETE', token: accessToken }),
+    onSuccess: async () => {
+      await refresh()
+      close()
+    },
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo borrar'),
+  })
+
+  function confirmRemove() {
+    if (!editing) return
+    Alert.alert('Borrar billetera', `¿Borrar "${editing.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Borrar', style: 'destructive', onPress: () => remove.mutate(editing.id) },
+    ])
+  }
 
   function submit() {
     setError(null)
@@ -180,6 +199,11 @@ export default function WalletsScreen() {
                 <Text style={formStyles.buttonText}>Guardar</Text>
               )}
             </Pressable>
+            {editing ? (
+              <Pressable onPress={confirmRemove} disabled={remove.isPending}>
+                <Text style={styles.delete}>Borrar billetera</Text>
+              </Pressable>
+            ) : null}
             <Pressable onPress={close}>
               <Text style={styles.cancel}>Cancelar</Text>
             </Pressable>
@@ -223,4 +247,5 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
   note: { fontSize: 13, color: colors.muted },
   cancel: { color: colors.muted, textAlign: 'center', paddingVertical: 8 },
+  delete: { color: colors.danger, textAlign: 'center', paddingVertical: 8, fontWeight: '600' },
 })
