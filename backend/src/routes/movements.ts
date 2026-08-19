@@ -440,6 +440,13 @@ router.delete(
     })
     if (!existing) throw new AppError(404, 'Movimiento no encontrado')
 
+    if (existing.type === MovementType.invoice) {
+      const collectionCount = await prisma.movement.count({ where: { invoiceId: existing.id } })
+      if (collectionCount > 0) {
+        throw new AppError(400, 'No se puede borrar una factura con cobros')
+      }
+    }
+
     await prisma.movement.delete({ where: { id: existing.id } })
     res.status(204).send()
   })

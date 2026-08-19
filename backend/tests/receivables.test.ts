@@ -297,3 +297,56 @@ describe('POST /movements type collection', () => {
     expect(sinInvoice.status).toBe(400)
   })
 })
+
+describe('DELETE /movements/:id de facturas', () => {
+  it('con cobros → 400; borrar el cobro primero la libera', async () => {
+    const { token, client, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const invoice = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        type: 'invoice',
+        clientId: client.id,
+        amount: 1000,
+        currency: 'USD',
+        dueDate: '2026-09-14',
+        description: 'Sprint 12',
+      })
+    const collection = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.body.id, walletId: usd.id, amount: 400 })
+
+    const blocked = await request(app)
+      .delete(`/movements/${invoice.body.id}`)
+      .set(auth(token))
+    expect(blocked.status).toBe(400)
+    expect(blocked.body.error).toBe('No se puede borrar una factura con cobros')
+
+    expect((await request(app).delete(`/movements/${collection.body.id}`).set(auth(token))).status).toBe(204)
+    expect((await request(app).delete(`/movements/${invoice.body.id}`).set(auth(token))).status).toBe(204)
+  })
+
+  it('factura de otro usuario → 404', async () => {
+    const owner = await setupUser()
+    const intruder = await setupUser()
+    const invoice = await request(app)
+      .post('/movements')
+      .set(auth(owner.token))
+      .send({
+        type: 'invoice',
+        clientId: owner.client.id,
+        amount: 1000,
+        currency: 'USD',
+        dueDate: '2026-09-14',
+        description: 'Sprint 12',
+      })
+
+    const res = await request(app)
+      .delete(`/movements/${invoice.body.id}`)
+      .set(auth(intruder.token))
+
+    expect(res.status).toBe(404)
+  })
+})
