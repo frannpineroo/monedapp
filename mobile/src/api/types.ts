@@ -35,9 +35,16 @@ export type WalletBalance = {
 export type Client = {
   id: string
   name: string
+  phone: string | null
   defaultCurrency: string
   createdAt: string
   updatedAt: string
+}
+
+export type Category = {
+  id: string
+  name: string
+  kind: 'EXPENSE' | 'INCOME'
 }
 
 export type ExchangeRate = {
@@ -63,5 +70,6 @@ export type Movement = {
   date: string
   wallet?: { id: string; name: string; currency: string }
   client?: { id: string; name: string } | null
+  category?: { id: string; name: string } | null
   exchangeRate?: ExchangeRate
 }

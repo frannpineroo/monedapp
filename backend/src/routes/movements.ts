@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { Currency, MovementType, Prisma } from '@prisma/client'
+import { AccountKind, Currency, MovementType, Prisma } from '@prisma/client'
 import { prisma } from '../prisma/prisma'
 import { asyncHandler } from '../lib/asyncHandler'
 import { AppError } from '../lib/errors'
@@ -19,6 +19,7 @@ router.use(requireAuth)
 const movementInclude = {
   wallet: { select: { id: true, name: true, currency: true } },
   client: { select: { id: true, name: true } },
+  categoryAccount: { select: { id: true, name: true } },
   exchangeRate: {
     select: { id: true, type: true, value: true, buy: true, sell: true, source: true, date: true },
   },
@@ -29,6 +30,29 @@ function parseMovementType(value: unknown): MovementType {
     throw new AppError(400, 'type inválido (income|expense|transfer)')
   }
   return value as MovementType
+}
+
+async function resolveCategoryAccountId(
+  userId: string,
+  movementType: MovementType,
+  categoryId: unknown
+): Promise<string | null> {
+  if (categoryId === undefined || categoryId === null) return null
+  if (typeof categoryId !== 'string') throw new AppError(400, 'categoryId inválido')
+  if (movementType === MovementType.transfer) {
+    throw new AppError(400, 'Las transferencias no llevan categoría')
+  }
+
+  const category = await prisma.account.findFirst({ where: { id: categoryId, userId } })
+  if (!category) throw new AppError(404, 'Categoría no encontrada')
+
+  const expected =
+    movementType === MovementType.expense ? AccountKind.EXPENSE : AccountKind.INCOME
+  if (category.kind !== expected) {
+    throw new AppError(400, 'La categoría no corresponde al tipo de movimiento')
+  }
+
+  return category.id
 }
 
 function parseDate(value: unknown): Date {
@@ -43,12 +67,13 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthedRequest
-    const { walletId, clientId, type, from, to } = req.query
+    const { walletId, clientId, categoryId, type, from, to } = req.query
 
     const where: Prisma.MovementWhereInput = { userId }
 
     if (typeof walletId === 'string') where.walletId = walletId
     if (typeof clientId === 'string') where.clientId = clientId
+    if (typeof categoryId === 'string') where.categoryAccountId = categoryId
     if (typeof type === 'string') where.type = parseMovementType(type)
     if (typeof from === 'string' || typeof to === 'string') {
       where.date = {}
@@ -78,6 +103,7 @@ router.post(
       description,
       date,
       exchangeRateType,
+      categoryId,
     } = req.body as Record<string, unknown>
 
     if (typeof walletId !== 'string') throw new AppError(400, 'walletId es requerido')
@@ -95,6 +121,8 @@ router.post(
       where: { id: walletId, userId },
     })
     if (!wallet) throw new AppError(404, 'Billetera no encontrada')
+
+    const categoryAccountId = await resolveCategoryAccountId(userId, movementType, categoryId)
 
     const rateType =
       exchangeRateType === undefined || exchangeRateType === null
@@ -142,6 +170,7 @@ router.post(
           exchangeRateId,
           description: description.trim(),
           date: movementDate,
+          categoryAccountId,
         },
       })
 
@@ -153,6 +182,7 @@ router.post(
         currency: created.currency,
         walletAccountId: wallet.accountId,
         toWalletAccountId,
+        categoryAccountId,
       })
 
       return tx.movement.findUniqueOrThrow({
@@ -190,7 +220,7 @@ router.patch(
     })
     if (!existing) throw new AppError(404, 'Movimiento no encontrado')
 
-    const { description, date, clientId } = req.body as Record<string, unknown>
+    const { description, date, clientId, categoryId } = req.body as Record<string, unknown>
     const data: Prisma.MovementUpdateInput = {}
 
     if (description !== undefined) {
@@ -214,6 +244,42 @@ router.patch(
       } else {
         throw new AppError(400, 'clientId inválido')
       }
+    }
+
+    if (categoryId !== undefined) {
+      const categoryAccountId = await resolveCategoryAccountId(userId, existing.type, categoryId)
+
+      const movement = await prisma.$transaction(async (tx) => {
+        const updated = await tx.movement.update({
+          where: { id: existing.id },
+          data: {
+            ...data,
+            categoryAccount: categoryAccountId
+              ? { connect: { id: categoryAccountId } }
+              : { disconnect: true },
+          },
+        })
+
+        // Monto, tipo y billetera no cambian: alcanza con reescribir las dos patas.
+        await tx.ledgerEntry.deleteMany({ where: { movementId: updated.id } })
+        await createLedgerForMovement(tx, {
+          userId,
+          movementId: updated.id,
+          type: updated.type,
+          amount: updated.amount,
+          currency: updated.currency,
+          walletAccountId: existing.wallet.accountId,
+          categoryAccountId,
+        })
+
+        return tx.movement.findUniqueOrThrow({
+          where: { id: updated.id },
+          include: movementInclude,
+        })
+      })
+
+      res.json(serializeMovement(movement))
+      return
     }
 
     const movement = await prisma.movement.update({

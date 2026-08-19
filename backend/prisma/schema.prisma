@@ -75,6 +75,7 @@ model Account {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   wallet       Wallet?
   ledgerEntries LedgerEntry[]
+  categorizedMovements Movement[] @relation("MovementCategory")
 
   @@unique([userId, name])
   @@index([userId])
@@ -102,6 +103,7 @@ model Client {
   id              String   @id @default(cuid())
   userId          String
   name            String
+  phone           String?
   defaultCurrency Currency @default(ARS)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -136,6 +138,7 @@ model Movement {
   userId         String
   walletId       String
   clientId       String?
+  categoryAccountId String?
   toWalletId     String?
   type           MovementType
   amount         Decimal      @db.Decimal(18, 2)
@@ -149,12 +152,14 @@ model Movement {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   wallet       Wallet        @relation(fields: [walletId], references: [id])
   client       Client?       @relation(fields: [clientId], references: [id])
+  categoryAccount Account? @relation("MovementCategory", fields: [categoryAccountId], references: [id], onDelete: Restrict)
   exchangeRate ExchangeRate  @relation(fields: [exchangeRateId], references: [id])
   ledgerEntries LedgerEntry[]
 
   @@index([userId])
   @@index([walletId])
   @@index([clientId])
+  @@index([categoryAccountId])
   @@index([date])
   @@map("movements")
 }

@@ -1,4 +1,4 @@
-import { Client, Movement, Wallet } from '@prisma/client'
+import { Account, Client, Movement, Wallet } from '@prisma/client'
 
 export function serializeWallet(wallet: Wallet) {
   return {
@@ -14,9 +14,18 @@ export function serializeClient(client: Client) {
   return {
     id: client.id,
     name: client.name,
+    phone: client.phone,
     defaultCurrency: client.defaultCurrency,
     createdAt: client.createdAt,
     updatedAt: client.updatedAt,
+  }
+}
+
+export function serializeCategory(account: Account) {
+  return {
+    id: account.id,
+    name: account.name,
+    kind: account.kind,
   }
 }
 
@@ -24,6 +33,7 @@ export function serializeMovement(
   movement: Movement & {
     wallet?: { id: string; name: string; currency: string }
     client?: { id: string; name: string } | null
+    categoryAccount?: { id: string; name: string } | null
     exchangeRate?: {
       id: string
       type: string
@@ -54,6 +64,9 @@ export function serializeMovement(
     client: movement.client
       ? { id: movement.client.id, name: movement.client.name }
       : undefined,
+    category: movement.categoryAccount
+      ? { id: movement.categoryAccount.id, name: movement.categoryAccount.name }
+      : null,
     exchangeRate: movement.exchangeRate
       ? {
           id: movement.exchangeRate.id,

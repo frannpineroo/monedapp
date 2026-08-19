@@ -21,6 +21,7 @@ export async function createLedgerForMovement(
     currency: Currency
     walletAccountId: string
     toWalletAccountId?: string | null
+    categoryAccountId?: string | null
   }
 ) {
   const amount = Number(params.amount)
@@ -31,13 +32,15 @@ export async function createLedgerForMovement(
   const entries: { accountId: string; change: number; currency: Currency }[] = []
 
   if (params.type === MovementType.income) {
-    const incomeAccountId = await getDefaultIncomeAccountId(tx, params.userId)
+    const incomeAccountId =
+      params.categoryAccountId ?? (await getDefaultIncomeAccountId(tx, params.userId))
     entries.push(
       { accountId: params.walletAccountId, change: amount, currency: params.currency },
       { accountId: incomeAccountId, change: -amount, currency: params.currency }
     )
   } else if (params.type === MovementType.expense) {
-    const expenseAccountId = await getDefaultExpenseAccountId(tx, params.userId)
+    const expenseAccountId =
+      params.categoryAccountId ?? (await getDefaultExpenseAccountId(tx, params.userId))
     entries.push(
       { accountId: expenseAccountId, change: amount, currency: params.currency },
       { accountId: params.walletAccountId, change: -amount, currency: params.currency }

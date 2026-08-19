@@ -6,6 +6,7 @@ import walletsRouter from './routes/wallets'
 import clientsRouter from './routes/clients'
 import movementsRouter from './routes/movements'
 import reportsRouter from './routes/reports'
+import categoriesRouter from './routes/categories'
 import exchangeRatesRouter from './routes/exchangeRates'
 
 export function createApp() {
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/clients', clientsRouter)
   app.use('/movements', movementsRouter)
   app.use('/reports', reportsRouter)
+  app.use('/categories', categoriesRouter)
   app.use('/exchange-rates', exchangeRatesRouter)
 
   return app

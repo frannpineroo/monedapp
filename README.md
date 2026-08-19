@@ -80,6 +80,14 @@ npx expo start
 | CRUD | `/movements` | Genera partida doble oculta |
 | GET | `/reports/balance-by-wallet` | Saldos por billetera |
 | GET | `/exchange-rates?currency=USD&date=YYYY-MM-DD` | Cotización real (oficial/blue/mep/cripto) con caché y fallback |
+| GET | `/categories?kind=EXPENSE\|INCOME` | Categorías de gasto y rubros de ingreso |
+| POST | `/categories` | Crear categoría (409 si el nombre se repite) |
+| POST | `/categories/defaults` | Traer el set sugerido (idempotente) |
+| PATCH | `/categories/:id` | Renombrar |
+| DELETE | `/categories/:id` | 400 si tiene movimientos o es la última del tipo |
+| GET | `/reports/by-category?month=YYYY-MM&type=expense` | Totales por categoría en ARS |
+| DELETE | `/wallets/:id` | 400 si la billetera tiene movimientos |
+| DELETE | `/clients/:id` | 400 si el cliente tiene movimientos |
 
 ## Fuera de este core
 

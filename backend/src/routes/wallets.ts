@@ -93,9 +93,17 @@ router.patch(
       throw new AppError(400, 'El nombre es requerido')
     }
 
-    const wallet = await prisma.wallet.update({
-      where: { id: existing.id },
-      data: { name: name.trim() },
+    const wallet = await prisma.$transaction(async (tx) => {
+      const updated = await tx.wallet.update({
+        where: { id: existing.id },
+        data: { name: name.trim() },
+      })
+      // La cuenta espejo no se ve en la app, pero un nombre viejo ensucia el ledger.
+      await tx.account.update({
+        where: { id: existing.accountId },
+        data: { name: `${name.trim()} (${existing.currency})` },
+      })
+      return updated
     })
     res.json(serializeWallet(wallet))
   })

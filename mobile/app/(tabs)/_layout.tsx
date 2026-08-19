@@ -41,6 +41,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabIcon name="plus-circle" color={String(color)} />,
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Ajustes',
+          tabBarIcon: ({ color }) => <TabIcon name="cog" color={String(color)} />,
+        }}
+      />
     </Tabs>
   )
 }

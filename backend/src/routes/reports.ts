@@ -1,8 +1,11 @@
 import { Router } from 'express'
+import { MovementType } from '@prisma/client'
 import { prisma } from '../prisma/prisma'
 import { asyncHandler } from '../lib/asyncHandler'
+import { AppError } from '../lib/errors'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { serializeWallet } from '../lib/serializers'
+import { sumByCategory } from '../services/reportService'
 
 const router = Router()
 router.use(requireAuth)
@@ -32,6 +35,47 @@ router.get(
     )
 
     res.json(balances)
+  })
+)
+
+/** 'YYYY-MM' → [primer día del mes, primer día del siguiente), en UTC. */
+function parseMonth(value: unknown): { from: Date; to: Date } {
+  const now = new Date()
+  const raw =
+    typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)
+      ? value
+      : `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+
+  const [year, month] = raw.split('-').map(Number)
+  return {
+    from: new Date(Date.UTC(year, month - 1, 1)),
+    to: new Date(Date.UTC(year, month, 1)),
+  }
+}
+
+router.get(
+  '/by-category',
+  asyncHandler(async (req, res) => {
+    const { userId } = req as AuthedRequest
+    const { month, type } = req.query
+
+    if (type !== undefined && type !== 'expense' && type !== 'income') {
+      throw new AppError(400, 'type inválido (expense|income)')
+    }
+    const movementType = type === 'income' ? MovementType.income : MovementType.expense
+    const { from, to } = parseMonth(month)
+
+    const movements = await prisma.movement.findMany({
+      where: { userId, type: movementType, date: { gte: from, lt: to } },
+      select: {
+        categoryAccountId: true,
+        amount: true,
+        categoryAccount: { select: { name: true } },
+        exchangeRate: { select: { value: true } },
+      },
+    })
+
+    res.json(sumByCategory(movements))
   })
 )
 

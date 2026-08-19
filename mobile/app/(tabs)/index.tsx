@@ -23,7 +23,7 @@ const typeLabel: Record<Movement['type'], string> = {
 }
 
 export default function HomeScreen() {
-  const { accessToken, user, logout } = useAuth()
+  const { accessToken, user } = useAuth()
   const router = useRouter()
 
   const balances = useQuery({
@@ -39,6 +39,20 @@ export default function HomeScreen() {
     enabled: !!accessToken,
   })
 
+  const month = new Date().toISOString().slice(0, 7)
+
+  const byCategory = useQuery({
+    queryKey: ['by-category', month],
+    queryFn: () =>
+      apiRequest<{ categoryId: string | null; name: string; total: number; percent: number }[]>(
+        `/reports/by-category?month=${month}&type=expense`,
+        { token: accessToken }
+      ),
+    enabled: !!accessToken,
+  })
+
+  const topCategories = (byCategory.data ?? []).slice(0, 5)
+
   const totalsByCurrency = useMemo(
     () => groupBalancesByCurrency(balances.data ?? []),
     [balances.data]
@@ -46,11 +60,12 @@ export default function HomeScreen() {
   const currencyEntries = Object.entries(totalsByCurrency)
   const recentMovements = (movements.data ?? []).slice(0, 5)
 
-  const refreshing = balances.isFetching || movements.isFetching
+  const refreshing = balances.isFetching || movements.isFetching || byCategory.isFetching
   const onRefresh = useCallback(() => {
     void balances.refetch()
     void movements.refetch()
-  }, [balances, movements])
+    void byCategory.refetch()
+  }, [balances, movements, byCategory])
 
   const loading = balances.isLoading || movements.isLoading
 
@@ -65,9 +80,6 @@ export default function HomeScreen() {
           <Text style={styles.hello}>Hola</Text>
           <Text style={styles.email}>{user?.email}</Text>
         </View>
-        <Pressable onPress={() => logout()}>
-          <Text style={styles.logout}>Salir</Text>
-        </Pressable>
       </View>
 
       {loading ? (
@@ -115,6 +127,27 @@ export default function HomeScreen() {
               ))
             )}
           </ScrollView>
+
+          {topCategories.length > 0 ? (
+            <>
+              <Text style={styles.sectionLabel}>En qué se te fue</Text>
+              <View style={styles.categoryCard}>
+                {topCategories.map((row) => (
+                  <View key={row.categoryId ?? row.name} style={styles.categoryRow}>
+                    <View style={styles.categoryHeader}>
+                      <Text style={styles.categoryName} numberOfLines={1}>
+                        {row.name}
+                      </Text>
+                      <Text style={styles.categoryTotal}>{formatAmount(row.total, 'ARS')}</Text>
+                    </View>
+                    <View style={styles.barTrack}>
+                      <View style={[styles.barFill, { width: `${Math.max(row.percent, 2)}%` }]} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabelInline}>Últimos movimientos</Text>
@@ -182,10 +215,6 @@ const styles = StyleSheet.create({
   email: {
     color: colors.muted,
     marginTop: 2,
-  },
-  logout: {
-    color: colors.accent,
-    fontWeight: '600',
   },
   sectionLabel: {
     fontSize: 14,
@@ -298,4 +327,24 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: 16,
   },
+  categoryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    gap: 12,
+    marginBottom: 24,
+  },
+  categoryRow: { gap: 6 },
+  categoryHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  categoryName: { flex: 1, fontSize: 14, color: colors.ink },
+  categoryTotal: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  barTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+    overflow: 'hidden',
+  },
+  barFill: { height: 8, borderRadius: 999, backgroundColor: colors.accent },
 })
