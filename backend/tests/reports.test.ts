@@ -75,3 +75,74 @@ describe('ensureMonotributoScales', () => {
     expect(Number(scales[0].monthlyFeeServices)).toBe(49527.18)
   })
 })
+
+describe('GET /reports/monotributo-alert', () => {
+  it('sin categoría elegida devuelve unset y una sugerida coherente', async () => {
+    const { token, wallets } = await setupUser()
+    const ars = wallets.find((w) => w.currency === 'ARS')!
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ walletId: ars.id, type: 'income', amount: 100000, description: 'Cobro' })
+
+    const res = await request(app).get('/reports/monotributo-alert').set(auth(token))
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('unset')
+    expect(res.body.category).toBeNull()
+    expect(res.body.suggestedCategory).toBe('A')
+    expect(res.body.incomeArs12m).toBe(100000)
+    expect(res.body.scales).toHaveLength(11)
+  })
+
+  it('un ingreso de hace 13 meses queda fuera de la ventana móvil', async () => {
+    const { token, wallets } = await setupUser()
+    const ars = wallets.find((w) => w.currency === 'ARS')!
+    const viejo = new Date()
+    viejo.setUTCMonth(viejo.getUTCMonth() - 13)
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: ars.id,
+        type: 'income',
+        amount: 500000,
+        description: 'Viejo',
+        date: viejo.toISOString().slice(0, 10),
+      })
+
+    const res = await request(app).get('/reports/monotributo-alert').set(auth(token))
+
+    expect(res.body.incomeArs12m).toBe(0)
+  })
+
+  it('las transferencias no cuentan como facturación', async () => {
+    const { token, wallets } = await setupUser()
+    const ars = wallets.filter((w) => w.currency === 'ARS')
+    const destino =
+      ars[1] ??
+      (await request(app).post('/wallets').set(auth(token)).send({ name: 'Otra ARS', currency: 'ARS' }))
+        .body
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ walletId: ars[0].id, type: 'income', amount: 10000, description: 'Cobro' })
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({
+        walletId: ars[0].id,
+        toWalletId: destino.id,
+        type: 'transfer',
+        amount: 5000,
+        description: 'Pase',
+      })
+
+    const res = await request(app).get('/reports/monotributo-alert').set(auth(token))
+
+    expect(res.body.incomeArs12m).toBe(10000)
+  })
+})

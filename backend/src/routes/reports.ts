@@ -5,7 +5,7 @@ import { asyncHandler } from '../lib/asyncHandler'
 import { AppError } from '../lib/errors'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { serializeWallet } from '../lib/serializers'
-import { sumByCategory } from '../services/reportService'
+import { getMonotributoAlert, sumByCategory } from '../services/reportService'
 
 const router = Router()
 router.use(requireAuth)
@@ -76,6 +76,14 @@ router.get(
     })
 
     res.json(sumByCategory(movements))
+  })
+)
+
+router.get(
+  '/monotributo-alert',
+  asyncHandler(async (req, res) => {
+    const { userId } = req as AuthedRequest
+    res.json(await getMonotributoAlert(userId))
   })
 )
 
