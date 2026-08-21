@@ -50,7 +50,7 @@ Deja el usuario **`fran@ejemplo.com` / `fran1234`** con 5 billeteras (ARS, USD, 
 
 Es re-ejecutable: borra el usuario de demo y lo vuelve a crear. No toca ningún otro usuario.
 
-**Después de correrlo hay que cerrar sesión en la app y volver a entrar.** Cada corrida recrea el usuario con otro `id`, y el token guardado sigue siendo válido (`requireAuth` sólo verifica la firma, no que el usuario exista): las pantallas cargan con listas vacías en vez de mandarte al login.
+Cada corrida recrea el usuario con otro `id`, así que la sesión abierta en la app queda huérfana: `requireAuth` la rechaza con 401 y la app cierra sesión sola. Volvé a entrar con el usuario de demo.
 
 Si `INTEGRATIONS_ENCRYPTION_KEY` no está en el `.env` o está mal formada, saltea la fila de integración y avisa; el resto de la demo funciona igual. La clave se lee como **base64**: `openssl rand -base64 32` (con `-hex` da 64 caracteres que decodifican a 48 bytes y el backend la rechaza).
 

@@ -2,6 +2,7 @@ import 'dotenv/config'
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../src/app'
+import { prisma } from '../src/prisma/prisma'
 
 const app = createApp()
 
@@ -78,6 +79,23 @@ describe('auth', () => {
     expect(res.body.accessToken).toBeTypeOf('string')
     expect(res.body.refreshToken).toBeTypeOf('string')
     expect(res.body.refreshToken).not.toBe(register.body.refreshToken)
+  })
+
+  it('token de un usuario borrado → 401, no una app vacía', async () => {
+    const registered = await request(app)
+      .post('/auth/register')
+      .send({ email: uniqueEmail(), password: 'password123' })
+    const token = registered.body.accessToken as string
+    const userId = registered.body.user.id as string
+
+    const before = await request(app).get('/wallets').set({ Authorization: `Bearer ${token}` })
+    expect(before.status).toBe(200)
+
+    await prisma.user.delete({ where: { id: userId } })
+
+    // La firma del token sigue siendo válida: lo que ya no existe es el usuario.
+    const after = await request(app).get('/wallets').set({ Authorization: `Bearer ${token}` })
+    expect(after.status).toBe(401)
   })
 
   it('refresh inválido → 401', async () => {

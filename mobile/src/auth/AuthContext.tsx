@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { apiRequest } from '../api/client'
+import { apiRequest, setOnUnauthorized } from '../api/client'
 import type { AuthResponse, User } from '../api/types'
 
 const ACCESS_KEY = 'monedapp.accessToken'
@@ -77,6 +77,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(null)
     setUserState(null)
   }, [])
+
+  // Token vencido o de un usuario que ya no existe: la sesión se cae sola en vez
+  // de dejar la app con pantallas rotas.
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      void logout()
+    })
+    return () => setOnUnauthorized(null)
+  }, [logout])
 
   const setUser = useCallback((next: User) => {
     setUserState(next)

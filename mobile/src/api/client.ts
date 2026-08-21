@@ -16,6 +16,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Qué hacer cuando el backend rechaza un token que la app creía bueno. Lo registra
+ * el AuthProvider; vive acá porque el cliente no puede depender del contexto.
+ */
+let onUnauthorized: (() => void) | null = null
+
+export function setOnUnauthorized(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -36,6 +46,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
+    // Sólo si el pedido llevaba token: un 401 del login es una contraseña mala,
+    // no una sesión vencida.
+    if (res.status === 401 && options.token) {
+      onUnauthorized?.()
+    }
     throw new ApiError(res.status, data.error ?? 'Error de red')
   }
   return data as T
