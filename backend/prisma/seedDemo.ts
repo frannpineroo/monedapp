@@ -306,25 +306,29 @@ async function main() {
   // --- Integración de Mercado Pago -----------------------------------------
   // Credenciales de mentira: la integración se ve conectada y el pago importado
   // aparece en "Para revisar", pero sincronizar contra MP de verdad va a fallar.
-  // Sin clave de cifrado no se puede escribir la fila; el resto de la demo no
-  // depende de ella, así que se saltea con un aviso en vez de abortar.
-  if (process.env.INTEGRATIONS_ENCRYPTION_KEY) {
+  // Sin clave de cifrado (o con una mal formada) no se puede escribir la fila. El
+  // resto de la demo no depende de ella: se saltea con un aviso en vez de abortar
+  // y dejar el usuario a medio cargar.
+  try {
+    const credentials = encryptSecret(
+      JSON.stringify({ accessToken: 'DEMO-not-a-real-token', refreshToken: 'DEMO' })
+    )
     await prisma.integration.create({
       data: {
         userId,
         provider: 'mercadopago',
-        credentials: encryptSecret(
-          JSON.stringify({ accessToken: 'DEMO-not-a-real-token', refreshToken: 'DEMO' })
-        ),
+        credentials,
         status: 'connected',
         externalAccountId: `demo-${Date.now()}`,
         lastSyncAt: new Date(),
         lastWebhookAt: new Date(),
       },
     })
-  } else {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    console.log(`Mercado Pago queda desconectado en Ajustes → Integraciones: ${reason}`)
     console.log(
-      'Sin INTEGRATIONS_ENCRYPTION_KEY: Mercado Pago queda desconectado en Ajustes → Integraciones.'
+      'La clave se lee como base64: generala con `openssl rand -base64 32`, no con -hex.'
     )
   }
 

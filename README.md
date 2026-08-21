@@ -48,7 +48,11 @@ npm run db:seed:demo
 
 Deja el usuario **`fran@ejemplo.com` / `fran1234`** con 5 billeteras (ARS, USD, USDT, caja chica y la de Mercado Pago), 3 clientes, categorías propias, 12 meses de movimientos, las cuatro facturas posibles (pendiente, vencida, cobrada a medias y cobrada), un pago importado esperando en "Para revisar" y la categoría de monotributo al 85% del techo, para que se vea el banner de alerta.
 
-Es re-ejecutable: borra el usuario de demo y lo vuelve a crear. No toca ningún otro usuario. Si `INTEGRATIONS_ENCRYPTION_KEY` no está en el `.env`, saltea la fila de integración y avisa; el resto de la demo funciona igual.
+Es re-ejecutable: borra el usuario de demo y lo vuelve a crear. No toca ningún otro usuario.
+
+**Después de correrlo hay que cerrar sesión en la app y volver a entrar.** Cada corrida recrea el usuario con otro `id`, y el token guardado sigue siendo válido (`requireAuth` sólo verifica la firma, no que el usuario exista): las pantallas cargan con listas vacías en vez de mandarte al login.
+
+Si `INTEGRATIONS_ENCRYPTION_KEY` no está en el `.env` o está mal formada, saltea la fila de integración y avisa; el resto de la demo funciona igual. La clave se lee como **base64**: `openssl rand -base64 32` (con `-hex` da 64 caracteres que decodifican a 48 bytes y el backend la rechaza).
 
 ### Tests de auth
 
