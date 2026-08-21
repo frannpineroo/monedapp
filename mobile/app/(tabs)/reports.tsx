@@ -1,11 +1,11 @@
 import { apiRequest } from '@/src/api/client'
-import type { MonthlySummary } from '@/src/api/types'
+import type { MonotributoAlert, MonthlySummary, User } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { formatArs } from '@/src/lib/format'
-import { colors, spacing } from '@/src/theme'
-import { Card, Money, Screen, Section, Txt } from '@/src/ui'
+import { formatArs, formatPercent } from '@/src/lib/format'
+import { colors, radius, spacing } from '@/src/theme'
+import { Card, Chip, ChipRow, Money, Screen, Section, Txt } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 
@@ -22,6 +22,13 @@ function monthLabel(month: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   })
+}
+
+/** El techo del monotributo pide acción sólo cuando aprieta: hasta ahí, tinta neutra. */
+function barColor(status: MonotributoAlert['status']): string {
+  if (status === 'exceeded') return colors.attention
+  if (status === 'warning') return colors.warning
+  return colors.brand
 }
 
 /** Flecha del selector de mes. Área de toque grande, sin fondo. */
@@ -79,7 +86,8 @@ function TotalCard({
 }
 
 export default function ReportsScreen() {
-  const { accessToken } = useAuth()
+  const { accessToken, setUser } = useAuth()
+  const queryClient = useQueryClient()
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
 
   const summary = useQuery({
@@ -89,6 +97,27 @@ export default function ReportsScreen() {
         token: accessToken,
       }),
     enabled: !!accessToken,
+  })
+
+  const alert = useQuery({
+    queryKey: ['monotributo-alert'],
+    queryFn: () =>
+      apiRequest<MonotributoAlert>('/reports/monotributo-alert', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+
+  const setCategory = useMutation({
+    mutationFn: (category: string) =>
+      apiRequest<User>('/users/me', {
+        method: 'PATCH',
+        token: accessToken,
+        body: { monotributoCategory: category },
+      }),
+    onSuccess: async (updated) => {
+      setUser(updated)
+      await queryClient.invalidateQueries({ queryKey: ['monotributo-alert'] })
+      await queryClient.invalidateQueries({ queryKey: ['monthly-summary'] })
+    },
   })
 
   const byCurrency = Object.entries(summary.data?.byCurrency ?? {})
@@ -104,8 +133,11 @@ export default function ReportsScreen() {
       scroll
       refreshControl={
         <RefreshControl
-          refreshing={summary.isFetching}
-          onRefresh={() => summary.refetch()}
+          refreshing={summary.isFetching || alert.isFetching}
+          onRefresh={() => {
+            void summary.refetch()
+            void alert.refetch()
+          }}
           tintColor={colors.muted}
           colors={[colors.brand]}
           progressBackgroundColor={colors.surface}
@@ -158,6 +190,82 @@ export default function ReportsScreen() {
               ) : null}
             </TotalCard>
           </Section>
+
+          {summary.data.topClients.length > 0 ? (
+            <Section title="Quién te pagó">
+              <Card>
+                {summary.data.topClients.map((client, index) => (
+                  <View
+                    key={client.id ?? client.name}
+                    style={[styles.clientRow, index > 0 && styles.clientRowSpaced]}
+                  >
+                    <Txt variant="body" numberOfLines={1} style={styles.clientName}>
+                      {client.name}
+                    </Txt>
+                    <Money value={client.totalArs} />
+                  </View>
+                ))}
+              </Card>
+            </Section>
+          ) : null}
+
+          {alert.data ? (
+            <Section title="Monotributo">
+              <Card attention={alert.data.status === 'exceeded'}>
+                {alert.data.percentUsed !== null ? (
+                  <>
+                    <Txt variant="caption" tone="muted">
+                      Usaste {formatPercent(alert.data.percentUsed)} del techo de la categoría{' '}
+                      {alert.data.category ?? alert.data.suggestedCategory} en los últimos 12 meses
+                    </Txt>
+                    <View style={styles.barTrack}>
+                      <View
+                        style={[
+                          styles.barFill,
+                          {
+                            width: `${Math.min(alert.data.percentUsed, 100)}%`,
+                            backgroundColor: barColor(alert.data.status),
+                          },
+                        ]}
+                      />
+                    </View>
+                    {alert.data.remaining !== null ? (
+                      <View style={styles.remainingRow}>
+                        <Txt variant="label" tone="faint">
+                          {alert.data.remaining < 0 ? 'Excedido' : 'Te queda'}
+                        </Txt>
+                        <Money
+                          value={Math.abs(alert.data.remaining)}
+                          tone={alert.data.remaining < 0 ? 'attention' : 'ink'}
+                        />
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <Txt variant="bodyMedium" tone="attention">
+                    Te pasaste del techo de todas las categorías.
+                  </Txt>
+                )}
+
+                <Txt variant="label" tone="faint" style={styles.chipsLabel}>
+                  Tu categoría
+                </Txt>
+                <ChipRow>
+                  {alert.data.scales.map((scale) => (
+                    <Chip
+                      key={scale.category}
+                      label={scale.category}
+                      selected={alert.data?.category === scale.category}
+                      onPress={() => setCategory.mutate(scale.category)}
+                    />
+                  ))}
+                </ChipRow>
+                <Txt variant="caption" tone="faint" style={styles.chipsHint}>
+                  La cuota de la categoría elegida es la que se descuenta arriba.
+                </Txt>
+              </Card>
+            </Section>
+          ) : null}
         </>
       )}
     </Screen>
@@ -185,6 +293,25 @@ const styles = StyleSheet.create({
   detail: { marginTop: spacing.md, gap: spacing.xs },
   detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   note: { marginTop: spacing.sm },
+  clientRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  clientRowSpaced: { marginTop: spacing.md },
+  clientName: { flex: 1 },
+  barTrack: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSunken,
+    overflow: 'hidden',
+    marginTop: spacing.md,
+  },
+  barFill: { height: 8, borderRadius: radius.pill },
+  remainingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  chipsLabel: { marginTop: spacing.xl, marginBottom: spacing.sm },
+  chipsHint: { marginTop: spacing.sm },
   loader: { marginTop: spacing.xxxl },
   error: { marginBottom: spacing.lg },
 })
