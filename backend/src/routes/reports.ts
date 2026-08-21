@@ -5,7 +5,7 @@ import { asyncHandler } from '../lib/asyncHandler'
 import { AppError } from '../lib/errors'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { serializeWallet } from '../lib/serializers'
-import { getMonotributoAlert, sumByCategory } from '../services/reportService'
+import { getMonotributoAlert, getMonthlySummary, sumByCategory } from '../services/reportService'
 
 const router = Router()
 router.use(requireAuth)
@@ -84,6 +84,20 @@ router.get(
   asyncHandler(async (req, res) => {
     const { userId } = req as AuthedRequest
     res.json(await getMonotributoAlert(userId))
+  })
+)
+
+router.get(
+  '/monthly-summary',
+  asyncHandler(async (req, res) => {
+    const { userId } = req as AuthedRequest
+    const { month } = req.query
+
+    if (month !== undefined && (typeof month !== 'string' || !/^\d{4}-\d{2}$/.test(month))) {
+      throw new AppError(400, 'month debe tener el formato YYYY-MM')
+    }
+
+    res.json(await getMonthlySummary(userId, month as string | undefined))
   })
 )
 

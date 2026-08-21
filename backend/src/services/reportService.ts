@@ -123,3 +123,83 @@ export async function getMonotributoAlert(userId: string, now = new Date()) {
     })),
   }
 }
+
+export function monthRange(month: string): { from: Date; to: Date } {
+  const [year, monthNumber] = month.split('-').map(Number)
+  return {
+    from: new Date(Date.UTC(year, monthNumber - 1, 1)),
+    to: new Date(Date.UTC(year, monthNumber, 1)),
+  }
+}
+
+export function currentMonth(now = new Date()): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+export async function getMonthlySummary(userId: string, month = currentMonth()) {
+  const { from, to } = monthRange(month)
+
+  const movements = await prisma.movement.findMany({
+    where: {
+      userId,
+      type: { in: [...BILLED_TYPES, MovementType.expense] },
+      date: { gte: from, lt: to },
+    },
+    select: {
+      type: true,
+      amount: true,
+      currency: true,
+      exchangeRate: { select: { value: true, type: true } },
+      client: { select: { id: true, name: true } },
+    },
+  })
+
+  const byCurrency: Record<string, { income: number; expense: number; net: number }> = {}
+  const clientTotals = new Map<string, { id: string | null; name: string; totalArs: number }>()
+  let incomeArs = 0
+  let expenseArs = 0
+
+  for (const movement of movements) {
+    const amount = Number(movement.amount)
+    const ars = toArs(movement.amount, movement.exchangeRate.value)
+    const bucket = (byCurrency[movement.currency] ??= { income: 0, expense: 0, net: 0 })
+
+    if (movement.type === MovementType.expense) {
+      bucket.expense = round2(bucket.expense + amount)
+      expenseArs = round2(expenseArs + ars)
+    } else {
+      bucket.income = round2(bucket.income + amount)
+      incomeArs = round2(incomeArs + ars)
+
+      const key = movement.client?.id ?? 'sin-cliente'
+      const entry = clientTotals.get(key) ?? {
+        id: movement.client?.id ?? null,
+        name: movement.client?.name ?? 'Sin cliente',
+        totalArs: 0,
+      }
+      entry.totalArs = round2(entry.totalArs + ars)
+      clientTotals.set(key, entry)
+    }
+
+    bucket.net = round2(bucket.income - bucket.expense)
+  }
+
+  // La cuota sale de la categoría elegida; si no eligió, de la sugerida por la alerta.
+  const alert = await getMonotributoAlert(userId)
+  const monthlyFee = alert.monthlyFee ?? 0
+
+  return {
+    month,
+    byCurrency,
+    incomeArs,
+    expenseArs,
+    netArs: round2(incomeArs - expenseArs),
+    topClients: [...clientTotals.values()].sort((a, b) => b.totalArs - a.totalArs).slice(0, 5),
+    tax: {
+      category: alert.category ?? alert.suggestedCategory,
+      monthlyFee,
+      source: alert.category ? ('user' as const) : ('suggested' as const),
+    },
+    netAfterTax: round2(incomeArs - expenseArs - monthlyFee),
+  }
+}
