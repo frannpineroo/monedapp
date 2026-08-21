@@ -254,3 +254,16 @@ model IntegrationWebhookEvent {
   @@index([provider, status])
   @@map("integration_webhook_events")
 }
+
+model MonotributoScale {
+  id                 String   @id @default(cuid())
+  category           String
+  validFrom          DateTime @db.Date
+  annualGrossLimit   Decimal  @db.Decimal(18, 2)
+  monthlyFeeServices Decimal  @db.Decimal(18, 2)
+  createdAt          DateTime @default(now())
+
+  @@unique([category, validFrom])
+  @@index([validFrom])
+  @@map("monotributo_scales")
+}
