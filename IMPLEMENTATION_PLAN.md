@@ -62,7 +62,7 @@ Seis specs aprobados, ninguno implementado. El detalle de cada uno (archivos, en
 | 3 | [Categorías de gasto y rubros de ingreso](docs/superpowers/specs/03-categorias.md) ✅ implementada | M | Antes de cualquier reporte, si no el reporte mensual se escribe dos veces. También define el rubro que usan la factura (fase 5) y la comisión de Mercado Pago (fase 4, que si no cae en “Gastos operativos”). |
 | 4 | [Integración Mercado Pago](docs/superpowers/specs/04-mercadopago.md) ✅ implementada (falta el smoke real, ver plan) | XL | Es la promesa central del spec (“integraciones que ahorran carga manual”) y el mayor salto de valor. Va antes de cobrables porque su parte bloqueante es externa (falta una URL HTTPS pública para callback y webhook): conviene empezarla temprano y dejar la verificación real en espera mientras se avanza con lo demás. |
 | 5 | [Cuentas por cobrar](docs/superpowers/specs/05-cuentas-por-cobrar.md) ✅ implementada | L | Necesita `phone` (fase 2) y el rubro de ingreso (fase 3). Introduce `LedgerEntry.changeArs` y reescribe `assertBalanced`, que hoy suma monedas distintas como si fueran comparables — hacerlo con los tests de ledger de Mercado Pago ya en verde da red de seguridad. |
-| 6 | [Reportes mensuales + monotributo](docs/superpowers/specs/06-reportes-monotributo.md) | M/L | Último a propósito: consume categorías (desglose), devengado (“facturé” = `invoice`, no cobranza), `changeArs` (conversión a ARS resuelta) y los movimientos importados de MP. Con el FX real de la fase 1, los números valen. |
+| 6 | [Reportes mensuales + monotributo](docs/superpowers/specs/06-reportes-monotributo.md) ✅ implementada | M/L | Último a propósito: consume categorías (desglose), devengado (“facturé” = `invoice`, no cobranza), `changeArs` (conversión a ARS resuelta) y los movimientos importados de MP. Con el FX real de la fase 1, los números valen. |
 
 ### Dependencias
 
@@ -90,7 +90,7 @@ Categorías ──► (rubro, comisión MP) ──┴──► Mercado Pago┤
 
 ## Choques entre specs a resolver al implementar
 
-- **Barra de tabs.** Los specs suman por su cuenta “Revisar” (MP), “Ajustes” (ABM) y “Reportes” — con Inicio/Movimientos/Nuevo serían seis. Decisión propuesta: dejar cinco tabs (Inicio · Movimientos · Nuevo · Reportes · Ajustes) y resolver la bandeja de revisión como filtro `needsReview` dentro de Movimientos más un banner en Inicio; “Por cobrar” e “Integraciones” quedan como pantallas stack.
+- **Barra de tabs.** ✅ Resuelto en la fase 6: quedaron cinco tabs (Inicio · Movimientos · Nuevo · Reportes · Ajustes). La bandeja de revisión que había agregado Mercado Pago dejó de ser tab y es el filtro “Para revisar” (`needsReview`) dentro de Movimientos, al que apunta el banner de Inicio; “Por cobrar” e “Integraciones” quedaron como pantallas stack.
 - **`serializeMovement`** lo tocan tres fases: `needsReview`/`source` (MP), `category` (categorías) y `dueDate`/`invoiceId`/`outstanding` (cobrables). Cada una suma campos, ninguna reemplaza.
 - **Detalle de movimiento.** MP crea `mobile/app/movement/[id].tsx` para editar y confirmar; cobrables necesita un detalle de factura. Reusar la misma pantalla en vez de escribir dos.
 - **`assertBalanced`.** El spec de MP lo anota como riesgo pre-existente (aritmética float); el de cobrables lo reescribe sobre `changeArs`. Cerrarlo en la fase 5, no antes.

@@ -90,8 +90,14 @@ npx expo start
 | PATCH | `/categories/:id` | Renombrar |
 | DELETE | `/categories/:id` | 400 si tiene movimientos o es la última del tipo |
 | GET | `/reports/by-category?month=YYYY-MM&type=expense` | Totales por categoría en ARS |
+| GET | `/reports/monthly-summary?month=YYYY-MM` | Facturado, gastado y neto después de la cuota |
+| GET | `/reports/monotributo-alert` | Uso del techo en 12 meses móviles + escalas |
+| GET | `/users/me` | Usuario actual |
+| PATCH | `/users/me` | Elegir o desactivar la categoría de monotributo |
 | DELETE | `/wallets/:id` | 400 si la billetera tiene movimientos |
 | DELETE | `/clients/:id` | 400 si el cliente tiene movimientos |
+
+Las escalas de monotributo cargadas **rigen desde el 1/8/2026** ("locaciones y prestaciones de servicios", fuente `afip.gob.ar/monotributo/categorias.asp`). Para actualizarlas se agrega un bloque nuevo con otro `validFrom` en `backend/src/config/monotributoScales.ts` y se corre `npm run db:seed`; el bloque viejo no se toca, es el histórico con el que se calcularon los reportes anteriores. La facturación que cuenta para el techo es la **devengada** (`income` + `invoice`): las transferencias y los cobros de facturas ya emitidas no suman.
 
 `LedgerEntry.changeArs` es el valor del asiento en ARS (con el snapshot del movimiento): es lo que permite balancear un cobro en otra moneda. Borrar una factura con cobros está bloqueado (400); hay que borrar primero los cobros.
 
