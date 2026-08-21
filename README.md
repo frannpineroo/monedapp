@@ -37,6 +37,19 @@ npm run dev
 # → http://localhost:8000/health
 ```
 
+### Datos de demo
+
+Para recorrer la app llena en vez de arrancar de cero:
+
+```bash
+cd backend
+npm run db:seed:demo
+```
+
+Deja el usuario **`fran@ejemplo.com` / `fran1234`** con 5 billeteras (ARS, USD, USDT, caja chica y la de Mercado Pago), 3 clientes, categorías propias, 12 meses de movimientos, las cuatro facturas posibles (pendiente, vencida, cobrada a medias y cobrada), un pago importado esperando en "Para revisar" y la categoría de monotributo al 85% del techo, para que se vea el banner de alerta.
+
+Es re-ejecutable: borra el usuario de demo y lo vuelve a crear. No toca ningún otro usuario. Si `INTEGRATIONS_ENCRYPTION_KEY` no está en el `.env`, saltea la fila de integración y avisa; el resto de la demo funciona igual.
+
 ### Tests de auth
 
 Con Postgres levantado (`docker compose up -d db`):

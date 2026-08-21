@@ -2,7 +2,7 @@
   "name": "monedapp-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "MonedApp API — ledger multi-moneda",
+  "description": "MonedApp API \u2014 ledger multi-moneda",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -11,6 +11,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seedDemo.ts",
     "db:push": "prisma db push",
     "test": "vitest run",
     "test:watch": "vitest"
