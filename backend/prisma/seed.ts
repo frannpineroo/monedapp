@@ -22,6 +22,10 @@ async function main() {
   }
 
   await getRates(Currency.ARS, d)
+
+  const { ensureMonotributoScales } = await import('../src/config/monotributoScales')
+  await ensureMonotributoScales()
+  console.log('Escalas de monotributo cargadas')
 }
 
 main()

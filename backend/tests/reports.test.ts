@@ -53,3 +53,25 @@ describe('escalas de monotributo', () => {
     expect(Number(stored.annualGrossLimit)).toBe(1000)
   })
 })
+
+describe('ensureMonotributoScales', () => {
+  it('carga 11 escalas y correrla dos veces no duplica', async () => {
+    const { ensureMonotributoScales, MONOTRIBUTO_VALID_FROM } = await import(
+      '../src/config/monotributoScales'
+    )
+
+    await ensureMonotributoScales()
+    await ensureMonotributoScales()
+
+    const scales = await prisma.monotributoScale.findMany({
+      where: { validFrom: MONOTRIBUTO_VALID_FROM },
+      orderBy: { annualGrossLimit: 'asc' },
+    })
+
+    expect(scales).toHaveLength(11)
+    expect(scales[0].category).toBe('A')
+    expect(scales[scales.length - 1].category).toBe('K')
+    expect(Number(scales[0].annualGrossLimit)).toBe(12009410.45)
+    expect(Number(scales[0].monthlyFeeServices)).toBe(49527.18)
+  })
+})
