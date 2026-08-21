@@ -252,7 +252,10 @@ export async function createCollectionLedger(
     },
   ]
 
-  if (fxDifference !== 0 || params.currency !== params.invoice.currency) {
+  // También aparece cobrando en la moneda de la factura: si la cotización del día
+  // del cobro no es la del día de la factura, el valor en ARS de la deuda cambió.
+  const hasFxLeg = fxDifference !== 0 || params.currency !== params.invoice.currency
+  if (hasFxLeg) {
     entries.push({
       accountId: fxDifferenceAccountId,
       change: fxDifference,
@@ -261,8 +264,7 @@ export async function createCollectionLedger(
     })
   }
 
-  // Único asiento del sistema con patas en monedas distintas: balancea solo en ARS.
-  await writeEntries(tx, params.movementId, entries, {
-    allowsMultiCurrency: params.currency !== params.invoice.currency,
-  })
+  // Único asiento del sistema con patas en monedas distintas: la pata de ajuste
+  // va siempre en ARS, así que en cuanto existe el cuadre sólo puede ser en ARS.
+  await writeEntries(tx, params.movementId, entries, { allowsMultiCurrency: hasFxLeg })
 }

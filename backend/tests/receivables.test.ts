@@ -238,6 +238,53 @@ describe('POST /movements type collection', () => {
     expect(entries.reduce((sum, e) => sum + Number(e.changeArs), 0)).toBe(0)
   })
 
+  it('cobro en la misma moneda con otra cotización deja la diferencia de cambio', async () => {
+    const { token, client, wallets } = await setupUser()
+    const usd = wallets.find((w) => w.currency === 'USD')!
+    const invoice = await issueInvoice(token, client.id, 1000, 'USD')
+
+    // La factura se selló con una cotización más baja que la de hoy: cobrarla en
+    // la misma moneda igual mueve el valor en ARS de la deuda.
+    const oldRateDate = new Date(Date.UTC(2026, 0, 2))
+    const oldRate = await prisma.exchangeRate.upsert({
+      where: {
+        date_type_currency: { date: oldRateDate, type: 'blue', currency: 'USD' },
+      },
+      create: {
+        currency: 'USD',
+        type: 'blue',
+        date: oldRateDate,
+        value: 900,
+        source: 'test',
+      },
+      update: { value: 900 },
+    })
+    await prisma.movement.update({
+      where: { id: invoice.id },
+      data: { exchangeRateId: oldRate.id },
+    })
+    await prisma.ledgerEntry.updateMany({
+      where: { movementId: invoice.id },
+      data: { changeArs: 0 },
+    })
+
+    const res = await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ type: 'collection', invoiceId: invoice.id, walletId: usd.id, amount: 1000 })
+
+    expect(res.status).toBe(201)
+
+    const entries = await prisma.ledgerEntry.findMany({
+      where: { movementId: res.body.id },
+      include: { account: true },
+    })
+    const fx = entries.find((e) => e.account.name === 'Diferencia de cambio')
+    expect(fx).toBeDefined()
+    expect(Number(fx!.changeArs)).not.toBe(0)
+    expect(entries.reduce((sum, e) => sum + Number(e.changeArs), 0)).toBe(0)
+  })
+
   it('un cobro que excede el saldo → 400', async () => {
     const { token, client, wallets } = await setupUser()
     const usd = wallets.find((w) => w.currency === 'USD')!
