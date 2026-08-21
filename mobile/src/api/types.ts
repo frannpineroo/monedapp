@@ -113,3 +113,34 @@ export type Integration = {
 
 export type ConnectResponse = { authorizationUrl: string }
 export type SyncResult = { scanned: number; created: number }
+
+export type MonotributoScale = {
+  category: string
+  annualGrossLimit: number
+  monthlyFeeServices: number
+}
+
+export type MonotributoAlert = {
+  status: 'unset' | 'ok' | 'warning' | 'exceeded'
+  category: string | null
+  suggestedCategory: string | null
+  incomeArs12m: number
+  limit: number | null
+  percentUsed: number | null
+  remaining: number | null
+  monthlyFee: number | null
+  windowFrom: string
+  windowTo: string
+  scales: MonotributoScale[]
+}
+
+export type MonthlySummary = {
+  month: string
+  byCurrency: Record<string, { income: number; expense: number; net: number }>
+  incomeArs: number
+  expenseArs: number
+  netArs: number
+  topClients: { id: string | null; name: string; totalArs: number }[]
+  tax: { category: string | null; monthlyFee: number; source: 'user' | 'suggested' }
+  netAfterTax: number
+}

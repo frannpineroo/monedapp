@@ -17,3 +17,12 @@ export function groupBalancesByCurrency(balances: WalletBalance[]): Record<strin
   }
   return totals
 }
+
+/** Plata grande: los centavos sobran y estorban. */
+export function formatArs(value: string | number) {
+  return `ARS ${Number(value).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+}
+
+export function formatPercent(value: string | number) {
+  return `${Number(value).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
+}
