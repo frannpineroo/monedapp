@@ -1,5 +1,5 @@
 import { apiRequest } from '@/src/api/client'
-import type { Movement, ReceivablesSummary, WalletBalance } from '@/src/api/types'
+import type { MonotributoAlert, Movement, ReceivablesSummary, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { groupBalancesByCurrency } from '@/src/lib/format'
 import { colors, radius, spacing } from '@/src/theme'
@@ -48,6 +48,13 @@ export default function HomeScreen() {
   const movements = useQuery({
     queryKey: ['movements', { limit: 5 }],
     queryFn: () => apiRequest<Movement[]>('/movements', { token: accessToken }),
+    enabled: !!accessToken,
+  })
+
+  const taxAlert = useQuery({
+    queryKey: ['monotributo-alert'],
+    queryFn: () =>
+      apiRequest<MonotributoAlert>('/reports/monotributo-alert', { token: accessToken }),
     enabled: !!accessToken,
   })
 
@@ -104,7 +111,8 @@ export default function HomeScreen() {
     void byCategory.refetch()
     void pending.refetch()
     void receivables.refetch()
-  }, [balances, movements, byCategory, pending, receivables])
+    void taxAlert.refetch()
+  }, [balances, movements, byCategory, pending, receivables, taxAlert])
 
   const loading = balances.isLoading || movements.isLoading
 
@@ -142,6 +150,22 @@ export default function HomeScreen() {
               </Txt>
               <Txt variant="caption" tone="faint" style={styles.bannerHint}>
                 Confirmá el tipo y la categoría para que entren al balance.
+              </Txt>
+            </Card>
+          ) : null}
+
+          {taxAlert.data &&
+          (taxAlert.data.status === 'warning' || taxAlert.data.status === 'exceeded') ? (
+            <Card attention onPress={() => router.push('/(tabs)/reports')} style={styles.banner}>
+              <Txt variant="bodyMedium">
+                {taxAlert.data.status === 'exceeded'
+                  ? 'Te pasaste del techo de tu categoría de monotributo'
+                  : `Usaste ${Math.round(taxAlert.data.percentUsed ?? 0)}% del techo de monotributo`}
+              </Txt>
+              <Txt variant="caption" tone="faint" style={styles.bannerHint}>
+                {taxAlert.data.status === 'exceeded'
+                  ? 'Mirá el reporte para ver a qué categoría te toca recategorizar.'
+                  : 'Ventana de 12 meses móviles. Tocá para ver el detalle.'}
               </Txt>
             </Card>
           ) : null}
