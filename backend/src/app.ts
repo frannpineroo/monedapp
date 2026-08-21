@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import authRouter from './routes/auth'
 import onboardingRouter from './routes/onboarding'
+import usersRouter from './routes/users'
 import walletsRouter from './routes/wallets'
 import clientsRouter from './routes/clients'
 import movementsRouter from './routes/movements'
@@ -24,6 +25,7 @@ export function createApp() {
   })
 
   app.use('/auth', authRouter)
+  app.use('/users', usersRouter)
   app.use(onboardingRouter)
   app.use('/wallets', walletsRouter)
   app.use('/clients', clientsRouter)

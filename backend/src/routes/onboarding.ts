@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { asyncHandler } from '../lib/asyncHandler'
 import { AppError } from '../lib/errors'
+import { serializeUser } from '../lib/serializers'
 import { requireAuth, AuthedRequest } from '../middleware/auth'
 import { applyOnboarding, listProfileTemplates } from '../services/onboardingService'
 
@@ -25,13 +26,7 @@ router.post(
     }
 
     const user = await applyOnboarding(userId, templateId)
-    res.json({
-      id: user.id,
-      email: user.email,
-      profileTemplate: user.profileTemplate,
-      monotributoCategory: user.monotributoCategory,
-      createdAt: user.createdAt,
-    })
+    res.json(serializeUser(user))
   })
 )
 

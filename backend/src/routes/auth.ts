@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { prisma } from '../prisma/prisma'
 import { asyncHandler } from '../lib/asyncHandler'
 import { AppError } from '../lib/errors'
+import { serializeUser } from '../lib/serializers'
 import {
   signAccessToken,
   signRefreshToken,
@@ -12,16 +13,6 @@ import {
 } from '../lib/jwt'
 
 const router = Router()
-
-function publicUser(user: { id: string; email: string; profileTemplate: string | null; monotributoCategory: string | null; createdAt: Date }) {
-  return {
-    id: user.id,
-    email: user.email,
-    profileTemplate: user.profileTemplate,
-    monotributoCategory: user.monotributoCategory,
-    createdAt: user.createdAt,
-  }
-}
 
 async function issueTokens(userId: string, email: string) {
   const accessToken = signAccessToken(userId, email)
@@ -63,7 +54,7 @@ router.post(
     })
 
     const tokens = await issueTokens(user.id, user.email)
-    res.status(201).json({ user: publicUser(user), ...tokens })
+    res.status(201).json({ user: serializeUser(user), ...tokens })
   })
 )
 
@@ -89,7 +80,7 @@ router.post(
     }
 
     const tokens = await issueTokens(user.id, user.email)
-    res.json({ user: publicUser(user), ...tokens })
+    res.json({ user: serializeUser(user), ...tokens })
   })
 )
 
@@ -120,7 +111,7 @@ router.post(
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: payload.sub } })
     const tokens = await issueTokens(user.id, user.email)
-    res.json({ user: publicUser(user), ...tokens })
+    res.json({ user: serializeUser(user), ...tokens })
   })
 )
 

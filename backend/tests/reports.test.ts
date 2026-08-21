@@ -146,3 +146,61 @@ describe('GET /reports/monotributo-alert', () => {
     expect(res.body.incomeArs12m).toBe(10000)
   })
 })
+
+describe('PATCH /users/me', () => {
+  it('elegir categoría cambia el estado de la alerta', async () => {
+    const { token, wallets } = await setupUser()
+    const ars = wallets.find((w) => w.currency === 'ARS')!
+
+    await request(app)
+      .post('/movements')
+      .set(auth(token))
+      .send({ walletId: ars.id, type: 'income', amount: 100000, description: 'Cobro' })
+
+    const patched = await request(app)
+      .patch('/users/me')
+      .set(auth(token))
+      .send({ monotributoCategory: 'A' })
+
+    expect(patched.status).toBe(200)
+    expect(patched.body.monotributoCategory).toBe('A')
+    expect(patched.body.passwordHash).toBeUndefined()
+
+    const alert = await request(app).get('/reports/monotributo-alert').set(auth(token))
+    expect(alert.body.status).toBe('ok')
+    expect(alert.body.category).toBe('A')
+    expect(alert.body.percentUsed).toBeGreaterThan(0)
+  })
+
+  it('categoría inexistente → 400', async () => {
+    const { token } = await setupUser()
+
+    const res = await request(app)
+      .patch('/users/me')
+      .set(auth(token))
+      .send({ monotributoCategory: 'Z' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('null desactiva la categoría', async () => {
+    const { token } = await setupUser()
+    await request(app).patch('/users/me').set(auth(token)).send({ monotributoCategory: 'A' })
+
+    const res = await request(app)
+      .patch('/users/me')
+      .set(auth(token))
+      .send({ monotributoCategory: null })
+
+    expect(res.body.monotributoCategory).toBeNull()
+  })
+
+  it('GET /users/me devuelve el usuario y el onboarding sigue funcionando', async () => {
+    const { token } = await setupUser()
+
+    const me = await request(app).get('/users/me').set(auth(token))
+
+    expect(me.status).toBe(200)
+    expect(me.body.profileTemplate).toBe('freelancer_software')
+  })
+})

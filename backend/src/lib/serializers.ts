@@ -1,4 +1,14 @@
-import { Account, Client, Integration, Movement, Wallet } from '@prisma/client'
+import { Account, Client, Integration, Movement, User, Wallet } from '@prisma/client'
+
+export function serializeUser(user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    profileTemplate: user.profileTemplate,
+    monotributoCategory: user.monotributoCategory,
+    createdAt: user.createdAt,
+  }
+}
 
 export function serializeWallet(wallet: Wallet) {
   return {
