@@ -65,13 +65,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="inbox"
+        name="reports"
         options={{
-          title: 'Revisar',
-          tabBarIcon: ({ color }) => <TabIcon name="inbox" color={String(color)} />,
-          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          title: 'Reportes',
+          tabBarIcon: ({ color }) => <TabIcon name="pie-chart" color={String(color)} />,
         }}
       />
+
       <Tabs.Screen
         name="settings"
         options={{

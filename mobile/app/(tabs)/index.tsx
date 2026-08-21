@@ -136,7 +136,7 @@ export default function HomeScreen() {
       ) : (
         <>
           {pendingCount > 0 ? (
-            <Card attention onPress={() => router.push('/(tabs)/inbox')} style={styles.banner}>
+            <Card attention onPress={() => router.push('/(tabs)/movements?review=1')} style={styles.banner}>
               <Txt variant="bodyMedium">
                 {pendingCount} movimiento{pendingCount === 1 ? '' : 's'} para revisar
               </Txt>

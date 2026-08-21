@@ -5,7 +5,7 @@ import { colors, spacing } from '@/src/theme'
 import { Chip, EmptyState, LedgerCell, LinkButton, ListRow, Screen, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useQuery } from '@tanstack/react-query'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 
@@ -17,10 +17,12 @@ const typeLabel: Record<Movement['type'], string> = {
   collection: 'Cobro',
 }
 
-type TypeFilter = 'all' | Movement['type']
+/** `review` no es un tipo: filtra lo que entró por una integración y espera confirmación. */
+type TypeFilter = 'all' | 'review' | Movement['type']
 
 const typeOptions: { id: TypeFilter; label: string }[] = [
   { id: 'all', label: 'Todos' },
+  { id: 'review', label: 'Para revisar' },
   { id: 'income', label: 'Ingresos' },
   { id: 'expense', label: 'Gastos' },
   { id: 'transfer', label: 'Transferencias' },
@@ -49,8 +51,9 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 export default function MovementsScreen() {
   const { accessToken } = useAuth()
   const router = useRouter()
+  const params = useLocalSearchParams<{ review?: string }>()
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(params.review ? 'review' : 'all')
   const [walletFilter, setWalletFilter] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
@@ -69,11 +72,12 @@ export default function MovementsScreen() {
   const movements = useQuery({
     queryKey: ['movements', { type: typeFilter, walletId: walletFilter, categoryId: categoryFilter }],
     queryFn: () => {
-      const params = new URLSearchParams()
-      if (typeFilter !== 'all') params.set('type', typeFilter)
-      if (walletFilter) params.set('walletId', walletFilter)
-      if (categoryFilter) params.set('categoryId', categoryFilter)
-      const qs = params.toString()
+      const query = new URLSearchParams()
+      if (typeFilter === 'review') query.set('needsReview', 'true')
+      else if (typeFilter !== 'all') query.set('type', typeFilter)
+      if (walletFilter) query.set('walletId', walletFilter)
+      if (categoryFilter) query.set('categoryId', categoryFilter)
+      const qs = query.toString()
       return apiRequest<Movement[]>(`/movements${qs ? `?${qs}` : ''}`, { token: accessToken })
     },
     enabled: !!accessToken,
@@ -161,8 +165,12 @@ export default function MovementsScreen() {
           ListEmptyComponent={
             hasFilters ? (
               <EmptyState
-                title="Nada con esos filtros"
-                body="Probá con otro tipo, otra billetera o sacá la categoría."
+                title={typeFilter === 'review' ? 'Todo al día' : 'Nada con esos filtros'}
+                body={
+                  typeFilter === 'review'
+                    ? 'Cuando llegue algo de una integración, aparece acá para que lo confirmes.'
+                    : 'Probá con otro tipo, otra billetera o sacá la categoría.'
+                }
                 actionLabel="Limpiar filtros"
                 onAction={() => {
                   setTypeFilter('all')
