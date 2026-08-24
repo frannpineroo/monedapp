@@ -2,7 +2,7 @@ import { apiRequest } from '@/src/api/client'
 import type { MonotributoAlert, Movement, ReceivablesSummary, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { groupBalancesByCurrency } from '@/src/lib/format'
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import {
   Button,
   Card,
@@ -13,12 +13,13 @@ import {
   Money,
   Screen,
   Section,
+  ThemedRefreshControl,
   Txt,
 } from '@/src/ui'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useCallback, useMemo } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native'
 
 const typeLabel: Record<Movement['type'], string> = {
   income: 'Ingreso',
@@ -36,6 +37,8 @@ function signFor(type: Movement['type']) {
 }
 
 export default function HomeScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const { accessToken, user } = useAuth()
   const router = useRouter()
 
@@ -119,15 +122,7 @@ export default function HomeScreen() {
   return (
     <Screen
       scroll
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.muted}
-          colors={[colors.brand]}
-          progressBackgroundColor={colors.surface}
-        />
-      }
+      refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.header}>
         <View style={styles.headerText}>
@@ -140,7 +135,7 @@ export default function HomeScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <>
           {pendingCount > 0 ? (
@@ -323,68 +318,69 @@ export default function HomeScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.lg,
-    marginBottom: spacing.xxl,
-  },
-  headerText: { flex: 1, gap: 2 },
-  loader: { marginTop: spacing.huge },
-  banner: { marginBottom: spacing.xxl },
-  bannerHint: { marginTop: spacing.xs },
-  restCurrencies: {
-    marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    gap: spacing.sm,
-  },
-  currencyRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-  },
-  owedOverdue: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  walletRow: { gap: spacing.md, paddingRight: spacing.xs },
-  walletCard: {
-    width: 152,
-    minHeight: 104,
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
-  walletAmount: { marginTop: spacing.lg },
-  categoryList: { gap: spacing.lg },
-  categoryRow: { gap: spacing.sm },
-  categoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  categoryName: { flex: 1 },
-  barTrack: {
-    height: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceRaised,
-    overflow: 'hidden',
-  },
-  barFill: { height: 4, borderRadius: radius.pill, backgroundColor: colors.borderStrong },
-  // La categoría que más se llevó se marca por jerarquía, no por color.
-  barFillLead: { backgroundColor: colors.ink },
-  movements: { gap: spacing.sm },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.lg,
+      marginBottom: spacing.xxl,
+    },
+    headerText: { flex: 1, gap: 2 },
+    loader: { marginTop: spacing.huge },
+    banner: { marginBottom: spacing.xxl },
+    bannerHint: { marginTop: spacing.xs },
+    restCurrencies: {
+      marginTop: spacing.lg,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+      gap: spacing.sm,
+    },
+    currencyRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+    },
+    owedOverdue: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
+    walletRow: { gap: spacing.md, paddingRight: spacing.xs },
+    walletCard: {
+      width: 152,
+      minHeight: 104,
+      justifyContent: 'space-between',
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      padding: spacing.lg,
+    },
+    walletAmount: { marginTop: spacing.lg },
+    categoryList: { gap: spacing.lg },
+    categoryRow: { gap: spacing.sm },
+    categoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    categoryName: { flex: 1 },
+    barTrack: {
+      height: 4,
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceRaised,
+      overflow: 'hidden',
+    },
+    barFill: { height: 4, borderRadius: radius.pill, backgroundColor: c.borderStrong },
+    // La categoría que más se llevó se marca por jerarquía, no por color.
+    barFillLead: { backgroundColor: c.ink },
+    movements: { gap: spacing.sm },
+  })
