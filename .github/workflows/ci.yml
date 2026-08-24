@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Un push nuevo sobre la misma rama cancela el run anterior: no tiene sentido
+# esperar resultados de un commit que ya quedó atrás.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (tests + tipos)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: monedapp
+          POSTGRES_USER: monedapp_user
+          POSTGRES_PASSWORD: monedapp_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U monedapp_user -d monedapp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Valores descartables, para una base efímera que vive lo que dura el job.
+      # NO son secretos: no reusar ninguno fuera de CI. El repo es público.
+      DATABASE_URL: postgresql://monedapp_user:monedapp_pass@localhost:5432/monedapp
+      JWT_ACCESS_SECRET: ci-access-secret-not-a-real-secret-32b
+      JWT_REFRESH_SECRET: ci-refresh-secret-not-a-real-secret-32
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 8100
+      # Tiene que decodificar a exactamente 32 bytes o el módulo de crypto tira.
+      INTEGRATIONS_ENCRYPTION_KEY: GJA8Cx4ukID53xcYHfAJYRBwD7Da5O9iCbL6uBX7Xng=
+      # CI no depende de que dolarapi esté arriba. Los tests que ejercitan el
+      # provider setean su propia env y mockean fetch.
+      FX_ENABLED: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # `postinstall` corre `prisma generate`, así que el cliente queda listo acá.
+      - name: Instalar dependencias
+        working-directory: backend
+        run: npm ci
+
+      - name: Aplicar migraciones
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Chequear tipos
+        working-directory: backend
+        run: npx tsc --noEmit
+
+      # vitest.config.ts tiene fileParallelism: false — los archivos comparten
+      # la misma base y corren en serie a propósito.
+      - name: Tests
+        working-directory: backend
+        run: npm test
+
+  mobile:
+    name: mobile (tipos + contraste)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # >= 22.18 hace falta para --experimental-strip-types, que usa
+          # check:contrast para importar palettes.ts desde un .mjs.
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: mobile
+        run: npm ci
+
+      # `.expo/types/router.d.ts` está gitignoreado y solo lo genera el dev
+      # server (verificado: `expo export` NO lo genera). Sin él, tsc compila
+      # igual pero DEJA DE VALIDAR las rutas: un router.push('/no-existe')
+      # pasa sin error. Arrancar Metro y matarlo tarda ~2s y devuelve el
+      # check a la misma severidad que en local.
+      - name: Generar tipos de rutas
+        working-directory: mobile
+        run: |
+          CI=1 npx expo start --port 8199 > /tmp/expo-start.log 2>&1 &
+          EXPO_PID=$!
+          for _ in $(seq 1 30); do
+            [ -f .expo/types/router.d.ts ] && break
+            sleep 2
+          done
+          kill "$EXPO_PID" 2>/dev/null || true
+          if [ ! -f .expo/types/router.d.ts ]; then
+            echo "::error::No se generaron los tipos de rutas. tsc validaría menos de lo que creés."
+            cat /tmp/expo-start.log
+            exit 1
+          fi
+          echo "Tipos de rutas generados."
+
+      - name: Chequear tipos
+        working-directory: mobile
+        run: npx tsc --noEmit
+
+      # Existe a partir del spec 7. El guard evita que el job se ponga rojo en
+      # ramas anteriores a ese merge; se puede sacar una vez mergeado.
+      - name: Contraste y regla de makeStyles
+        working-directory: mobile
+        run: |
+          if [ -f scripts/check-contrast.mjs ]; then
+            npm run check:contrast
+          else
+            echo "check-contrast.mjs todavía no existe en esta rama — se saltea."
+          fi
