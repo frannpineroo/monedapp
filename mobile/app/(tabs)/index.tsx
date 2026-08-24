@@ -1,7 +1,7 @@
 import { apiRequest } from '@/src/api/client'
 import type { MonotributoAlert, Movement, ReceivablesSummary, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { groupBalancesByCurrency } from '@/src/lib/format'
+import { groupBalancesByCurrency, signForType, toneForType } from '@/src/lib/format'
 import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import {
   Button,
@@ -27,13 +27,6 @@ const typeLabel: Record<Movement['type'], string> = {
   transfer: 'Transferencia',
   invoice: 'Factura',
   collection: 'Cobro',
-}
-
-/** Los gastos se guardan en positivo: el signo lo pone la vista. */
-function signFor(type: Movement['type']) {
-  if (type === 'expense') return '-' as const
-  if (type === 'income' || type === 'collection') return '+' as const
-  return undefined
 }
 
 export default function HomeScreen() {
@@ -296,8 +289,8 @@ export default function HomeScreen() {
                       <LedgerCell
                         value={item.amount}
                         currency={item.currency}
-                        sign={signFor(item.type)}
-                        tone={item.type === 'income' || item.type === 'collection' ? 'positive' : 'ink'}
+                        sign={signForType(item.type)}
+                        tone={toneForType(item.type)}
                       />
                     }
                   />
@@ -379,8 +372,9 @@ const makeStyles = (c: Colors) =>
       backgroundColor: c.surfaceRaised,
       overflow: 'hidden',
     },
-    barFill: { height: 4, borderRadius: radius.pill, backgroundColor: c.borderStrong },
-    // La categoría que más se llevó se marca por jerarquía, no por color.
-    barFillLead: { backgroundColor: c.ink },
+    // Todo lo de esta sección es gasto: la barra va en el rojo de gasto y la
+    // que más se llevó se distingue por opacidad, no por otro color.
+    barFill: { height: 4, borderRadius: radius.pill, backgroundColor: c.expense, opacity: 0.55 },
+    barFillLead: { opacity: 1 },
     movements: { gap: spacing.sm },
   })

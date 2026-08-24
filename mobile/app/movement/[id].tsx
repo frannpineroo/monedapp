@@ -1,7 +1,7 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { Client, Movement, Receivable, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { formatAmount } from '@/src/lib/format'
+import { formatAmount, signForType, toneForType } from '@/src/lib/format'
 import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { Button, Chip, ChipRow, Field, Money, Screen, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -157,7 +157,12 @@ export default function MovementDetailScreen() {
         <Txt variant="label" tone="faint">
           {data.currency}
         </Txt>
-        <Money value={data.amount} variant="display" />
+        <Money
+          value={data.amount}
+          variant="display"
+          sign={signForType(data.type)}
+          tone={toneForType(data.type)}
+        />
         <Txt variant="caption" tone="faint" align="right" style={styles.heroMeta}>
           {typeLabel[data.type]} · {data.wallet?.name ?? data.currency} · {data.source ?? 'manual'}
         </Txt>
@@ -208,7 +213,7 @@ export default function MovementDetailScreen() {
                   <Txt variant="caption" tone="faint">
                     {new Date(c.date).toLocaleDateString('es-AR')}
                   </Txt>
-                  <Money value={c.amount} tone="positive" />
+                  <Money value={c.amount} tone="positive" sign="+" />
                 </View>
               ))}
             </View>

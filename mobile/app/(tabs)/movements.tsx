@@ -1,6 +1,7 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
+import { signForType, toneForType } from '@/src/lib/format'
 import { spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { Chip, EmptyState, LedgerCell, LinkButton, ListRow, Screen, ThemedRefreshControl, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
@@ -27,12 +28,6 @@ const typeOptions: { id: TypeFilter; label: string }[] = [
   { id: 'expense', label: 'Gastos' },
   { id: 'transfer', label: 'Transferencias' },
 ]
-
-function signFor(type: Movement['type']) {
-  if (type === 'expense') return '-' as const
-  if (type === 'income' || type === 'collection') return '+' as const
-  return undefined
-}
 
 /** Fila de filtros: rótulo fijo y chips que se desplazan en horizontal. */
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -214,8 +209,8 @@ export default function MovementsScreen() {
                   <LedgerCell
                     value={item.amount}
                     currency={item.currency}
-                    sign={signFor(item.type)}
-                    tone={item.type === 'income' || item.type === 'collection' ? 'positive' : 'ink'}
+                    sign={signForType(item.type)}
+                    tone={toneForType(item.type)}
                   />
                 }
               />
