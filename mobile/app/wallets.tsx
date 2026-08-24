@@ -1,14 +1,15 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { Wallet, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, spacing } from '@/src/theme'
-import { Button, Chip, ChipRow, EmptyState, Field, LedgerCell, ListRow, Screen, Sheet, Txt } from '@/src/ui'
+import { spacing, useThemeColors } from '@/src/theme'
+import { Button, Chip, ChipRow, EmptyState, Field, LedgerCell, ListRow, Screen, Sheet, ThemedRefreshControl, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native'
 
 export default function WalletsScreen() {
+  const c = useThemeColors()
   const { accessToken } = useAuth()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState<Wallet | null>(null)
@@ -106,7 +107,7 @@ export default function WalletsScreen() {
       footer={<Button label="Nueva billetera" size="lg" block onPress={openCreate} />}
     >
       {balances.isLoading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={balances.data ?? []}
@@ -114,13 +115,7 @@ export default function WalletsScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={balances.isFetching}
-              onRefresh={() => balances.refetch()}
-              tintColor={colors.muted}
-              colors={[colors.brand]}
-              progressBackgroundColor={colors.surface}
-            />
+            <ThemedRefreshControl refreshing={balances.isFetching} onRefresh={() => balances.refetch()} />
           }
           ListEmptyComponent={
             <EmptyState

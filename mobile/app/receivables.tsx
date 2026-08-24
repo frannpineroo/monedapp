@@ -1,13 +1,13 @@
 import { apiRequest } from '@/src/api/client'
 import type { Receivable, ReceivableStatus } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, spacing } from '@/src/theme'
-import { Chip, ChipRow, EmptyState, LedgerCell, ListRow, Screen } from '@/src/ui'
+import { spacing, useThemeColors } from '@/src/theme'
+import { Chip, ChipRow, EmptyState, LedgerCell, ListRow, Screen, ThemedRefreshControl } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native'
 
 type Filter = 'all' | ReceivableStatus
 
@@ -33,6 +33,7 @@ function amountLabel(value: number, currency: string) {
 }
 
 export default function ReceivablesScreen() {
+  const c = useThemeColors()
   const { accessToken } = useAuth()
   const router = useRouter()
   const [filter, setFilter] = useState<Filter>('all')
@@ -62,7 +63,7 @@ export default function ReceivablesScreen() {
       </View>
 
       {receivables.isLoading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={receivables.data ?? []}
@@ -70,13 +71,7 @@ export default function ReceivablesScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={receivables.isFetching}
-              onRefresh={() => receivables.refetch()}
-              tintColor={colors.muted}
-              colors={[colors.brand]}
-              progressBackgroundColor={colors.surface}
-            />
+            <ThemedRefreshControl refreshing={receivables.isFetching} onRefresh={() => receivables.refetch()} />
           }
           ListEmptyComponent={
             <EmptyState

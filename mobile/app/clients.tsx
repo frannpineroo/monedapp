@@ -1,14 +1,15 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { Client } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, spacing } from '@/src/theme'
-import { Button, Chip, ChipRow, EmptyState, Field, ListRow, Screen, Sheet, Txt } from '@/src/ui'
+import { spacing, useThemeColors } from '@/src/theme'
+import { Button, Chip, ChipRow, EmptyState, Field, ListRow, Screen, Sheet, ThemedRefreshControl, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native'
 
 export default function ClientsScreen() {
+  const c = useThemeColors()
   const { accessToken } = useAuth()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState<Client | null>(null)
@@ -97,7 +98,7 @@ export default function ClientsScreen() {
       footer={<Button label="Nuevo cliente" size="lg" block onPress={openCreate} />}
     >
       {clients.isLoading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={clients.data ?? []}
@@ -105,13 +106,7 @@ export default function ClientsScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={clients.isFetching}
-              onRefresh={() => clients.refetch()}
-              tintColor={colors.muted}
-              colors={[colors.brand]}
-              progressBackgroundColor={colors.surface}
-            />
+            <ThemedRefreshControl refreshing={clients.isFetching} onRefresh={() => clients.refetch()} />
           }
           ListEmptyComponent={
             <EmptyState

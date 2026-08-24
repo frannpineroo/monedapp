@@ -1,16 +1,17 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { Category } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, spacing } from '@/src/theme'
-import { Button, Chip, ChipRow, EmptyState, Field, ListRow, Screen, Sheet } from '@/src/ui'
+import { spacing, useThemeColors } from '@/src/theme'
+import { Button, Chip, ChipRow, EmptyState, Field, ListRow, Screen, Sheet, ThemedRefreshControl } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native'
 
 type Kind = 'EXPENSE' | 'INCOME'
 
 export default function CategoriesScreen() {
+  const c = useThemeColors()
   const { accessToken } = useAuth()
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<Kind>('EXPENSE')
@@ -111,7 +112,7 @@ export default function CategoriesScreen() {
       </View>
 
       {categories.isLoading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={categories.data ?? []}
@@ -119,13 +120,7 @@ export default function CategoriesScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={categories.isFetching}
-              onRefresh={() => categories.refetch()}
-              tintColor={colors.muted}
-              colors={[colors.brand]}
-              progressBackgroundColor={colors.surface}
-            />
+            <ThemedRefreshControl refreshing={categories.isFetching} onRefresh={() => categories.refetch()} />
           }
           ListEmptyComponent={
             <EmptyState
