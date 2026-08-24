@@ -1,4 +1,4 @@
-import { colors, spacing } from '@/src/theme'
+import { spacing, useThemeStyles, type Colors } from '@/src/theme'
 import type { ReactNode } from 'react'
 import {
   ScrollView,
@@ -23,6 +23,7 @@ type Props = {
 }
 
 export function Screen({ children, scroll, refreshControl, contentStyle, edges = ['top'], footer }: Props) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <SafeAreaView style={styles.safe} edges={edges}>
       {scroll ? (
@@ -45,20 +46,21 @@ export function Screen({ children, scroll, refreshControl, contentStyle, edges =
 
 export const screenPadding = spacing.xl
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  flex: { flex: 1 },
-  content: {
-    paddingHorizontal: screenPadding,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.huge,
-  },
-  footer: {
-    paddingHorizontal: screenPadding,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: c.bg },
+    flex: { flex: 1 },
+    content: {
+      paddingHorizontal: screenPadding,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.huge,
+    },
+    footer: {
+      paddingHorizontal: screenPadding,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+      backgroundColor: c.bg,
+    },
+  })
