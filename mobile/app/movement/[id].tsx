@@ -2,7 +2,7 @@ import { ApiError, apiRequest } from '@/src/api/client'
 import type { Client, Movement, Receivable, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount } from '@/src/lib/format'
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { Button, Chip, ChipRow, Field, Money, Screen, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as Linking from 'expo-linking'
@@ -19,6 +19,8 @@ const typeLabel: Record<Movement['type'], string> = {
 }
 
 export default function MovementDetailScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const theme = useThemeColors()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { accessToken } = useAuth()
   const queryClient = useQueryClient()
@@ -125,7 +127,7 @@ export default function MovementDetailScreen() {
   if (movement.isLoading || !movement.data) {
     return (
       <Screen contentStyle={styles.centered}>
-        <ActivityIndicator color={colors.brand} />
+        <ActivityIndicator color={theme.brand} />
       </Screen>
     )
   }
@@ -267,51 +269,52 @@ export default function MovementDetailScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  centered: { alignItems: 'center', justifyContent: 'center' },
-  hero: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  heroMeta: { marginTop: spacing.sm },
-  field: { marginBottom: spacing.xl },
-  group: { gap: spacing.sm, marginBottom: spacing.xl },
-  invoiceCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  outstandingRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  collections: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  collectionRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-  },
-  error: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.attentionEdge,
-    backgroundColor: colors.attentionSoft,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    centered: { alignItems: 'center', justifyContent: 'center' },
+    hero: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      padding: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    heroMeta: { marginTop: spacing.sm },
+    field: { marginBottom: spacing.xl },
+    group: { gap: spacing.sm, marginBottom: spacing.xl },
+    invoiceCard: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      padding: spacing.lg,
+      gap: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    outstandingRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    collections: {
+      gap: spacing.sm,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
+    collectionRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+    },
+    error: {
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+  })

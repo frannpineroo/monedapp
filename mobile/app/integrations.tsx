@@ -1,7 +1,7 @@
 import { ApiError, apiRequest } from '@/src/api/client'
 import type { ConnectResponse, Integration, SyncResult } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeStyles, type Colors } from '@/src/theme'
 import { Badge, Button, Card, Screen, Txt, type BadgeTone } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as Linking from 'expo-linking'
@@ -22,6 +22,7 @@ const statusTone: Record<string, BadgeTone> = {
 }
 
 export default function IntegrationsScreen() {
+  const styles = useThemeStyles(makeStyles)
   const { accessToken } = useAuth()
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
@@ -156,23 +157,24 @@ export default function IntegrationsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  intro: { marginBottom: spacing.lg },
-  card: { marginBottom: spacing.xl },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  actions: { gap: spacing.md },
-  error: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.attentionEdge,
-    backgroundColor: colors.attentionSoft,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    intro: { marginBottom: spacing.lg },
+    card: { marginBottom: spacing.xl },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    actions: { gap: spacing.md },
+    error: {
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+  })

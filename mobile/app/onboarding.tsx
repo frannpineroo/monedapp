@@ -1,7 +1,7 @@
 import { apiRequest } from '@/src/api/client'
 import type { ProfileTemplate, User } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { Card, Screen, Txt } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
@@ -9,6 +9,8 @@ import { useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 
 export default function OnboardingScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const { accessToken, setUser } = useAuth()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +41,7 @@ export default function OnboardingScreen() {
   if (templates.isLoading) {
     return (
       <Screen contentStyle={styles.centered}>
-        <ActivityIndicator color={colors.brand} />
+        <ActivityIndicator color={c.brand} />
       </Screen>
     )
   }
@@ -72,9 +74,9 @@ export default function OnboardingScreen() {
                 </Txt>
               </View>
               {busyId === item.id ? (
-                <ActivityIndicator color={colors.brand} />
+                <ActivityIndicator color={c.brand} />
               ) : (
-                <Feather name="arrow-right" size={18} color={colors.faint} />
+                <Feather name="arrow-right" size={18} color={c.faint} />
               )}
             </View>
           </Card>
@@ -84,20 +86,21 @@ export default function OnboardingScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  centered: { alignItems: 'center', justifyContent: 'center' },
-  content: { paddingTop: spacing.huge },
-  intro: { gap: spacing.sm, marginBottom: spacing.xxxl },
-  list: { gap: spacing.md },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  cardText: { flex: 1 },
-  cardDesc: { marginTop: spacing.xs },
-  error: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.attentionEdge,
-    backgroundColor: colors.attentionSoft,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    centered: { alignItems: 'center', justifyContent: 'center' },
+    content: { paddingTop: spacing.huge },
+    intro: { gap: spacing.sm, marginBottom: spacing.xxxl },
+    list: { gap: spacing.md },
+    cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+    cardText: { flex: 1 },
+    cardDesc: { marginTop: spacing.xs },
+    error: {
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+  })
