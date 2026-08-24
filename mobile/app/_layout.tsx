@@ -1,5 +1,5 @@
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext'
-import { colors, fonts, ThemeProvider as AppThemeProvider, type } from '@/src/theme'
+import { fonts, ThemeProvider as AppThemeProvider, type, useTheme } from '@/src/theme'
 import {
   Archivo_400Regular,
   Archivo_500Medium,
@@ -8,7 +8,15 @@ import {
 } from '@expo-google-fonts/archivo'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useFonts } from 'expo-font'
-import { DarkTheme, Stack, ThemeProvider, useRouter, useSegments, type Theme } from 'expo-router'
+import {
+  DarkTheme,
+  DefaultTheme,
+  Stack,
+  ThemeProvider,
+  useRouter,
+  useSegments,
+  type Theme,
+} from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
@@ -17,30 +25,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 SplashScreen.preventAutoHideAsync()
 
-const navTheme: Theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.brand,
-    background: colors.bg,
-    card: colors.bg,
-    text: colors.ink,
-    border: colors.border,
-    notification: colors.brand,
-  },
-}
-
-/** Cabecera compartida por las pantallas apiladas fuera de las tabs. */
-const stackHeader = {
-  headerShown: true,
-  headerStyle: { backgroundColor: colors.bg },
-  headerShadowVisible: false,
-  headerTintColor: colors.ink,
-  headerTitleStyle: { ...type.heading, color: colors.ink },
-  headerBackTitleStyle: { fontFamily: fonts.medium },
-} as const
-
 function AuthGate({ children }: { children: React.ReactNode }) {
+  const { colors: c } = useTheme()
   const { user, loading } = useAuth()
   const segments = useSegments()
   const router = useRouter()
@@ -68,13 +54,67 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.brand} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}>
+        <ActivityIndicator color={c.brand} />
       </View>
     )
   }
 
   return <>{children}</>
+}
+
+function ThemedApp() {
+  const { name, colors: c } = useTheme()
+
+  const navTheme: Theme = {
+    ...(name === 'dark' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(name === 'dark' ? DarkTheme : DefaultTheme).colors,
+      primary: c.brand,
+      background: c.bg,
+      card: c.bg,
+      text: c.ink,
+      border: c.border,
+      notification: c.brand,
+    },
+  }
+
+  /** Cabecera compartida por las pantallas apiladas fuera de las tabs. */
+  const stackHeader = {
+    headerShown: true,
+    headerStyle: { backgroundColor: c.bg },
+    headerShadowVisible: false,
+    headerTintColor: c.ink,
+    headerTitleStyle: { ...type.heading, color: c.ink },
+    headerBackTitleStyle: { fontFamily: fonts.medium },
+  } as const
+
+  return (
+    <ThemeProvider value={navTheme}>
+      <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
+      <AuthGate>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="wallets" options={{ ...stackHeader, title: 'Billeteras' }} />
+          <Stack.Screen name="clients" options={{ ...stackHeader, title: 'Clientes' }} />
+          <Stack.Screen name="categories" options={{ ...stackHeader, title: 'Categorías' }} />
+          <Stack.Screen name="integrations" options={{ ...stackHeader, title: 'Integraciones' }} />
+          <Stack.Screen name="movement/[id]" options={{ ...stackHeader, title: 'Movimiento' }} />
+          <Stack.Screen name="receivables" options={{ ...stackHeader, title: 'Te deben' }} />
+        </Stack>
+      </AuthGate>
+    </ThemeProvider>
+  )
+}
+
+function ThemeGate() {
+  const { loading } = useTheme()
+  // Sin preferencia leída todavía: mejor esperar detrás del splash que
+  // mostrar un frame con el tema equivocado.
+  if (loading) return null
+  return <ThemedApp />
 }
 
 export default function RootLayout() {
@@ -99,26 +139,11 @@ export default function RootLayout() {
   return (
     <AppThemeProvider>
       <SafeAreaProvider>
-        <ThemeProvider value={navTheme}>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <StatusBar style="light" />
-              <AuthGate>
-                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-                  <Stack.Screen name="(auth)" />
-                  <Stack.Screen name="onboarding" />
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="wallets" options={{ ...stackHeader, title: 'Billeteras' }} />
-                  <Stack.Screen name="clients" options={{ ...stackHeader, title: 'Clientes' }} />
-                  <Stack.Screen name="categories" options={{ ...stackHeader, title: 'Categorías' }} />
-                  <Stack.Screen name="integrations" options={{ ...stackHeader, title: 'Integraciones' }} />
-                  <Stack.Screen name="movement/[id]" options={{ ...stackHeader, title: 'Movimiento' }} />
-                  <Stack.Screen name="receivables" options={{ ...stackHeader, title: 'Te deben' }} />
-                </Stack>
-              </AuthGate>
-            </AuthProvider>
-          </QueryClientProvider>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <ThemeGate />
+          </AuthProvider>
+        </QueryClientProvider>
       </SafeAreaProvider>
     </AppThemeProvider>
   )
