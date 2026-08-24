@@ -1,4 +1,4 @@
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeStyles, type Colors } from '@/src/theme'
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Txt } from './Text'
 
@@ -10,6 +10,7 @@ type ChipProps = {
 }
 
 export function Chip({ label, selected, onPress, style }: ChipProps) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <Pressable
       onPress={onPress}
@@ -30,22 +31,24 @@ export function Chip({ label, selected, onPress, style }: ChipProps) {
 }
 
 export function ChipRow({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useThemeStyles(makeStyles)
   return <View style={[styles.row, style]}>{children}</View>
 }
 
-const styles = StyleSheet.create({
-  chip: {
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  // Seleccionado en tinte, no en rojo pleno: el rojo lleno queda para las acciones.
-  chipSelected: { backgroundColor: colors.brandSoft, borderColor: colors.brand },
-  pressed: { backgroundColor: colors.surfaceRaised },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    chip: {
+      borderRadius: radius.pill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      minHeight: 36,
+      justifyContent: 'center',
+    },
+    // Seleccionado en tinte, no en relleno pleno: el relleno queda para las acciones.
+    chipSelected: { backgroundColor: c.brandSoft, borderColor: c.brand },
+    pressed: { backgroundColor: c.surfaceRaised },
+    row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  })

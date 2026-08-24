@@ -1,4 +1,4 @@
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeStyles, type Colors } from '@/src/theme'
 import type { ReactNode } from 'react'
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native'
 import { Txt } from './Text'
@@ -12,6 +12,7 @@ type Props = {
 
 /** Hoja inferior para altas y ediciones. Se cierra tocando fuera. */
 export function Sheet({ visible, title, onClose, children }: Props) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -30,27 +31,28 @@ export function Sheet({ visible, title, onClose, children }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  dismissArea: { flex: 1 },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xxl,
-    borderTopRightRadius: radius.xxl,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderStrong,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.lg,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.borderStrong,
-    alignSelf: 'center',
-    marginBottom: spacing.sm,
-  },
-  title: { marginBottom: spacing.xs },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    dismissArea: { flex: 1 },
+    sheet: {
+      backgroundColor: c.surface,
+      borderTopLeftRadius: radius.xxl,
+      borderTopRightRadius: radius.xxl,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.borderStrong,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xxxl,
+      gap: spacing.lg,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: radius.pill,
+      backgroundColor: c.borderStrong,
+      alignSelf: 'center',
+      marginBottom: spacing.sm,
+    },
+    title: { marginBottom: spacing.xs },
+  })

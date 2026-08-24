@@ -1,4 +1,4 @@
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeStyles, type Colors } from '@/src/theme'
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { Txt } from './Text'
@@ -16,6 +16,7 @@ type Props = {
 }
 
 export function ListRow({ title, meta, right, onPress, attention, left }: Props) {
+  const styles = useThemeStyles(makeStyles)
   const body = (
     <>
       {attention ? <View style={styles.rule} /> : null}
@@ -47,34 +48,36 @@ export function ListRow({ title, meta, right, onPress, attention, left }: Props)
 
 /** Separador de filas dentro de una misma tarjeta. */
 export function RowDivider() {
+  const styles = useThemeStyles(makeStyles)
   return <View style={styles.divider} />
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    minHeight: 64,
-  },
-  pressed: { backgroundColor: colors.surfaceRaised },
-  rule: { width: 3, backgroundColor: colors.attention },
-  inner: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  text: { flex: 1 },
-  meta: { marginTop: 2 },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginLeft: spacing.lg,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      overflow: 'hidden',
+      minHeight: 64,
+    },
+    pressed: { backgroundColor: c.surfaceRaised },
+    rule: { width: 3, backgroundColor: c.attention },
+    inner: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    text: { flex: 1 },
+    meta: { marginTop: 2 },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.border,
+      marginLeft: spacing.lg,
+    },
+  })

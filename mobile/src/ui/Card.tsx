@@ -1,4 +1,4 @@
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeStyles, type Colors } from '@/src/theme'
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 
@@ -12,6 +12,7 @@ type Props = {
 }
 
 export function Card({ children, style, attention, onPress, padded = true }: Props) {
+  const styles = useThemeStyles(makeStyles)
   const content = (
     <>
       {attention ? <View style={styles.rule} /> : null}
@@ -33,17 +34,18 @@ export function Card({ children, style, attention, onPress, padded = true }: Pro
   return <View style={[styles.card, style]}>{content}</View>
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    flexDirection: 'row',
-  },
-  pressed: { backgroundColor: colors.surfaceRaised },
-  body: { flex: 1 },
-  padding: { padding: spacing.lg },
-  rule: { width: 3, backgroundColor: colors.attention },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      overflow: 'hidden',
+      flexDirection: 'row',
+    },
+    pressed: { backgroundColor: c.surfaceRaised },
+    body: { flex: 1 },
+    padding: { padding: spacing.lg },
+    rule: { width: 3, backgroundColor: c.attention },
+  })
