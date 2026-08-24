@@ -47,9 +47,9 @@ jobs:
       FX_ENABLED: 'false'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -79,9 +79,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # >= 22.18 hace falta para --experimental-strip-types, que usa
           # check:contrast para importar palettes.ts desde un .mjs.
@@ -119,13 +119,14 @@ jobs:
         working-directory: mobile
         run: npx tsc --noEmit
 
-      # Existe a partir del spec 7. El guard evita que el job se ponga rojo en
-      # ramas anteriores a ese merge; se puede sacar una vez mergeado.
       - name: Contraste y regla de makeStyles
         working-directory: mobile
-        run: |
-          if [ -f scripts/check-contrast.mjs ]; then
-            npm run check:contrast
-          else
-            echo "check-contrast.mjs todavía no existe en esta rama — se saltea."
-          fi
+        run: npm run check:contrast
+
+      # Smoke test de build. `tsc` valida tipos, no resolución en runtime: un
+      # import que no resuelve, un asset que falta o un módulo nativo mal usado
+      # compilan igual y recién explotan al bundlear. Esto lo agarra antes.
+      # `all` cubre ios, android y web, que resuelven módulos distinto.
+      - name: Bundle
+        working-directory: mobile
+        run: npx expo export --platform all --output-dir "$RUNNER_TEMP/expo-smoke"
