@@ -1,7 +1,7 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Client, ExchangeRate, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, radius, spacing, type } from '@/src/theme'
+import { radius, spacing, type, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { Button, Chip, ChipRow, Field, Screen, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
@@ -19,6 +19,7 @@ const typeOptions: { id: MovementType; label: string }[] = [
 
 /** Grupo de opciones: rótulo arriba, chips debajo. */
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <View style={styles.group}>
       <Txt variant="label" tone="faint">
@@ -30,6 +31,8 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function NewMovementScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const { accessToken } = useAuth()
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -284,8 +287,8 @@ export default function NewMovementScreen() {
           style={styles.amountInput}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor={colors.faint}
-          selectionColor={colors.brand}
+          placeholderTextColor={c.faint}
+          selectionColor={c.brand}
           value={amount}
           onChangeText={setAmount}
         />
@@ -453,39 +456,40 @@ export default function NewMovementScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  title: { marginBottom: spacing.lg },
-  typeRow: { marginBottom: spacing.xl },
-  amountCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  amountInput: {
-    ...type.display,
-    color: colors.ink,
-    textAlign: 'right',
-    paddingVertical: spacing.xs,
-  },
-  field: { marginBottom: spacing.xl },
-  group: { gap: spacing.sm, marginBottom: spacing.xl },
-  inlineCreate: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: -spacing.md,
-    marginBottom: spacing.xl,
-  },
-  inlineField: { flex: 1 },
-  error: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.attentionEdge,
-    backgroundColor: colors.attentionSoft,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    title: { marginBottom: spacing.lg },
+    typeRow: { marginBottom: spacing.xl },
+    amountCard: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      padding: spacing.lg,
+      marginBottom: spacing.xl,
+    },
+    amountInput: {
+      ...type.display,
+      color: c.ink,
+      textAlign: 'right',
+      paddingVertical: spacing.xs,
+    },
+    field: { marginBottom: spacing.xl },
+    group: { gap: spacing.sm, marginBottom: spacing.xl },
+    inlineCreate: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginTop: -spacing.md,
+      marginBottom: spacing.xl,
+    },
+    inlineField: { flex: 1 },
+    error: {
+      borderRadius: radius.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.danger,
+      backgroundColor: c.dangerSoft,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+  })
