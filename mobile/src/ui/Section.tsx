@@ -1,4 +1,4 @@
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import type { ReactNode } from 'react'
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Button } from './Button'
@@ -12,6 +12,7 @@ type SectionProps = {
 }
 
 export function Section({ title, action, children, style }: SectionProps) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <View style={[styles.section, style]}>
       <View style={styles.header}>
@@ -34,6 +35,7 @@ type EmptyProps = {
 }
 
 export function EmptyState({ title, body, actionLabel, onAction }: EmptyProps) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <View style={styles.empty}>
       <Txt variant="bodyStrong">{title}</Txt>
@@ -49,51 +51,53 @@ export function EmptyState({ title, body, actionLabel, onAction }: EmptyProps) {
   )
 }
 
-export type BadgeTone = 'neutral' | 'brand' | 'attention' | 'positive' | 'warning'
-
-const badgeColors: Record<BadgeTone, { bg: string; fg: string }> = {
-  neutral: { bg: colors.surfaceRaised, fg: colors.muted },
-  brand: { bg: colors.brandSoft, fg: colors.brand },
-  attention: { bg: colors.attentionSoft, fg: colors.attention },
-  positive: { bg: colors.positiveSoft, fg: colors.positive },
-  warning: { bg: colors.warningSoft, fg: colors.warning },
-}
+export type BadgeTone = 'neutral' | 'brand' | 'attention' | 'positive' | 'expense'
 
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: BadgeTone }) {
-  const c = badgeColors[tone]
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
+  const badgeColors: Record<BadgeTone, { bg: string; fg: string }> = {
+    neutral: { bg: c.surfaceRaised, fg: c.muted },
+    brand: { bg: c.brandSoft, fg: c.brand },
+    attention: { bg: c.attentionSoft, fg: c.attention },
+    positive: { bg: c.positiveSoft, fg: c.positive },
+    expense: { bg: c.expenseSoft, fg: c.expense },
+  }
+  const badge = badgeColors[tone]
   return (
-    <View style={[styles.badge, { backgroundColor: c.bg }]}>
-      <Txt variant="label" style={{ color: c.fg }}>
+    <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+      <Txt variant="label" style={{ color: badge.fg }}>
         {label}
       </Txt>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  section: { gap: spacing.md, marginBottom: spacing.xxl },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 20,
-  },
-  empty: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xxxl,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-  },
-  emptyBody: { maxWidth: 260 },
-  emptyAction: { marginTop: spacing.sm },
-  badge: {
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    section: { gap: spacing.md, marginBottom: spacing.xxl },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 20,
+    },
+    empty: {
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.xxxl,
+      paddingHorizontal: spacing.xl,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderStyle: 'dashed',
+    },
+    emptyBody: { maxWidth: 260 },
+    emptyAction: { marginTop: spacing.sm },
+    badge: {
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      alignSelf: 'flex-start',
+    },
+  })
