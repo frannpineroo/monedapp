@@ -10,6 +10,8 @@ Un archivo por spec aprobado. Ninguno está implementado todavía. El orden de e
 | 4 | [Integración Mercado Pago](04-mercadopago.md) | XL | Aprobado, sin implementar |
 | 5 | [Cuentas por cobrar](05-cuentas-por-cobrar.md) | L | Aprobado, sin implementar |
 | 6 | [Reportes mensuales + monotributo](06-reportes-monotributo.md) | M/L | Aprobado, sin implementar |
+| 7 | [Recalibración de color y tema claro](07-color-y-tema-claro.md) | L | Aprobado, sin implementar |
+| 8 | [Modal de nuevo movimiento y selects](08-modal-movimiento-y-selects.md) | M | Propuesto |
 
 ## Convenciones
 
