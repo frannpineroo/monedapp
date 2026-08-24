@@ -345,7 +345,7 @@ Mismo helper en el monto principal.
 | Cabecera de stack | [_layout.tsx:34-41](../../../mobile/app/_layout.tsx#L34-L41) | `stackHeader` pasa de `const` de módulo a `useMemo` dentro del componente. |
 | Barra de estado | [_layout.tsx:105](../../../mobile/app/_layout.tsx#L105) | `<StatusBar style={name === 'dark' ? 'light' : 'dark'} />`. |
 | Fondo del documento web | [+html.tsx:31-35](../../../mobile/app/+html.tsx#L31-L35) | El CSS crudo pasa a `@media (prefers-color-scheme: light) { body { background-color: #F6F6F4 } }` con `#141414` por defecto. **Limitación conocida:** este CSS se resuelve antes de que la app lea AsyncStorage, así que en web un usuario con preferencia manual opuesta al sistema puede ver un flash del fondo del sistema. Aceptado; la alternativa (script inline que lea `localStorage`) queda fuera de alcance. |
-| Splash y adaptive icon | [app.json:26-36](../../../mobile/app.json#L26-L36) | El plugin `expo-splash-screen` acepta variante oscura, y `android.adaptiveIcon.backgroundColor` es un color único. **Verificar la forma exacta de la config contra los docs versionados de SDK 57** (https://docs.expo.dev/versions/v57.0.0/sdk/splash-screen/) antes de escribir, según [mobile/AGENTS.md](../../../mobile/AGENTS.md). Si la variante clara no está soportada en SDK 57, el splash queda oscuro en ambos temas y se anota como deuda, no se inventa una config. |
+| Splash y adaptive icon | [app.json:26-36](../../../mobile/app.json#L26-L36) | Verificado en expo-splash-screen de SDK 57: el plugin acepta `dark.backgroundColor` / `dark.image`; el splash claro usa `#F6F6F4` a nivel raíz y el oscuro `#141414` en `dark`. `android.adaptiveIcon.backgroundColor` queda en el oscuro (un color único por definición). |
 | `expo.backgroundColor` | [app.json:44](../../../mobile/app.json#L44) | `#141414` (nuevo `bg` oscuro). |
 
 ## Ajustes — sección "Apariencia"
@@ -481,7 +481,6 @@ El QA manual no se comprime: hay que mirar las pantallas.
 - **Temas por usuario en el backend.** La preferencia es local al dispositivo. Nada se guarda en `User`.
 - **Runner de tests en `mobile/`.** El proyecto no tiene uno; agregarlo es una decisión de infraestructura con su propio costo y merece su propio spec.
 - **Eliminar el flash de fondo en web** para usuarios con preferencia manual opuesta al sistema. Documentado como limitación conocida arriba.
-- **Splash claro** si SDK 57 no lo soporta de forma limpia. Se anota como deuda, no se fuerza.
 
 ## Relacionados
 
