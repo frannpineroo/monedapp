@@ -1,7 +1,7 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Client, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { Button, Screen, Section, Txt } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
@@ -9,6 +9,8 @@ import { useRouter, type Href } from 'expo-router'
 import { Pressable, StyleSheet, View } from 'react-native'
 
 export default function SettingsScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const { accessToken, user, logout } = useAuth()
   const router = useRouter()
 
@@ -62,7 +64,7 @@ export default function SettingsScreen() {
                     {row.count}
                   </Txt>
                 ) : null}
-                <Feather name="chevron-right" size={16} color={colors.faint} />
+                <Feather name="chevron-right" size={16} color={c.faint} />
               </View>
             </Pressable>
           ))}
@@ -86,29 +88,30 @@ export default function SettingsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  title: { marginBottom: spacing.xxl },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    minHeight: 52,
-  },
-  rowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  rowPressed: { backgroundColor: colors.surfaceRaised },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  logoutRow: { padding: spacing.lg },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    title: { marginBottom: spacing.xxl },
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      overflow: 'hidden',
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.lg,
+      minHeight: 52,
+    },
+    rowBorder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    rowPressed: { backgroundColor: c.surfaceRaised },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    logoutRow: { padding: spacing.lg },
+  })

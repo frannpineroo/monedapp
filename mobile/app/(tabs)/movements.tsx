@@ -1,13 +1,13 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { colors, spacing } from '@/src/theme'
-import { Chip, EmptyState, LedgerCell, LinkButton, ListRow, Screen, Txt } from '@/src/ui'
+import { spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
+import { Chip, EmptyState, LedgerCell, LinkButton, ListRow, Screen, ThemedRefreshControl, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, View } from 'react-native'
 
 const typeLabel: Record<Movement['type'], string> = {
   income: 'Ingreso',
@@ -36,6 +36,7 @@ function signFor(type: Movement['type']) {
 
 /** Fila de filtros: rótulo fijo y chips que se desplazan en horizontal. */
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <View style={styles.filterRow}>
       <Txt variant="label" tone="faint" style={styles.filterLabel}>
@@ -49,6 +50,8 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 export default function MovementsScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const { accessToken } = useAuth()
   const router = useRouter()
   const params = useLocalSearchParams<{ review?: string }>()
@@ -146,18 +149,15 @@ export default function MovementsScreen() {
       </View>
 
       {movements.isLoading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <FlatList
           data={rows}
           keyExtractor={(item) => item.id}
           refreshControl={
-            <RefreshControl
+            <ThemedRefreshControl
               refreshing={movements.isFetching}
               onRefresh={() => movements.refetch()}
-              tintColor={colors.muted}
-              colors={[colors.brand]}
-              progressBackgroundColor={colors.surface}
             />
           }
           contentContainerStyle={styles.list}
@@ -227,24 +227,25 @@ export default function MovementsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  screen: { paddingTop: spacing.sm },
-  header: { paddingHorizontal: screenPadding, gap: 2, marginBottom: spacing.lg },
-  filters: {
-    gap: spacing.md,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  filterRow: { gap: spacing.sm },
-  moreRow: { paddingHorizontal: screenPadding },
-  filterLabel: { paddingHorizontal: screenPadding },
-  chips: { gap: spacing.sm, paddingHorizontal: screenPadding },
-  loader: { marginTop: spacing.xxxl },
-  list: {
-    gap: spacing.sm,
-    paddingHorizontal: screenPadding,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.huge,
-  },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    screen: { paddingTop: spacing.sm },
+    header: { paddingHorizontal: screenPadding, gap: 2, marginBottom: spacing.lg },
+    filters: {
+      gap: spacing.md,
+      paddingBottom: spacing.lg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    filterRow: { gap: spacing.sm },
+    moreRow: { paddingHorizontal: screenPadding },
+    filterLabel: { paddingHorizontal: screenPadding },
+    chips: { gap: spacing.sm, paddingHorizontal: screenPadding },
+    loader: { marginTop: spacing.xxxl },
+    list: {
+      gap: spacing.sm,
+      paddingHorizontal: screenPadding,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.huge,
+    },
+  })
