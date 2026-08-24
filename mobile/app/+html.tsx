@@ -19,7 +19,7 @@ export default function Root({ children }: { children: ReactNode }) {
         */}
         <ScrollViewStyleReset />
 
-        {/* Using raw CSS styles as an escape-hatch to ensure the background color never flickers in dark-mode. */}
+        {/* El fondo del documento acompaña al lienzo de la app en cada tema. */}
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
         {/* Add any additional <head> elements that you want globally available on web... */}
       </head>
@@ -28,8 +28,13 @@ export default function Root({ children }: { children: ReactNode }) {
   );
 }
 
-// La app es de tema oscuro fijo: el fondo del documento acompaña al lienzo.
+// El fondo del documento acompaña al lienzo de la app en cada tema.
 const responsiveBackground = `
 body {
-  background-color: #171717;
+  background-color: #141414;
+}
+@media (prefers-color-scheme: light) {
+  body {
+    background-color: #F6F6F4;
+  }
 }`;
