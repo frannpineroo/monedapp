@@ -1,5 +1,5 @@
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext'
-import { colors, fonts, type } from '@/src/theme'
+import { colors, fonts, ThemeProvider as AppThemeProvider, type } from '@/src/theme'
 import {
   Archivo_400Regular,
   Archivo_500Medium,
@@ -97,27 +97,29 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider value={navTheme}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <StatusBar style="light" />
-            <AuthGate>
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="onboarding" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="wallets" options={{ ...stackHeader, title: 'Billeteras' }} />
-                <Stack.Screen name="clients" options={{ ...stackHeader, title: 'Clientes' }} />
-                <Stack.Screen name="categories" options={{ ...stackHeader, title: 'Categorías' }} />
-                <Stack.Screen name="integrations" options={{ ...stackHeader, title: 'Integraciones' }} />
-                <Stack.Screen name="movement/[id]" options={{ ...stackHeader, title: 'Movimiento' }} />
-                <Stack.Screen name="receivables" options={{ ...stackHeader, title: 'Te deben' }} />
-              </Stack>
-            </AuthGate>
-          </AuthProvider>
-        </QueryClientProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <AppThemeProvider>
+      <SafeAreaProvider>
+        <ThemeProvider value={navTheme}>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <StatusBar style="light" />
+              <AuthGate>
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="onboarding" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="wallets" options={{ ...stackHeader, title: 'Billeteras' }} />
+                  <Stack.Screen name="clients" options={{ ...stackHeader, title: 'Clientes' }} />
+                  <Stack.Screen name="categories" options={{ ...stackHeader, title: 'Categorías' }} />
+                  <Stack.Screen name="integrations" options={{ ...stackHeader, title: 'Integraciones' }} />
+                  <Stack.Screen name="movement/[id]" options={{ ...stackHeader, title: 'Movimiento' }} />
+                  <Stack.Screen name="receivables" options={{ ...stackHeader, title: 'Te deben' }} />
+                </Stack>
+              </AuthGate>
+            </AuthProvider>
+          </QueryClientProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </AppThemeProvider>
   )
 }
