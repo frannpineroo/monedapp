@@ -3,7 +3,7 @@ import type { MonotributoAlert, MonthlySummary, User } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatArs, formatPercent } from '@/src/lib/format'
 import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
-import { Card, Chip, ChipRow, Money, Screen, Section, ThemedRefreshControl, Txt } from '@/src/ui'
+import { Card, Chip, ChipRow, Money, Screen, Section, ThemedRefreshControl, Txt, type Tone } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -24,9 +24,12 @@ function monthLabel(month: string): string {
   })
 }
 
-/** El techo del monotributo pide acción sólo cuando aprieta: hasta ahí, azul. */
+/**
+ * El techo del monotributo: azul mientras sobra, ámbar cuando aprieta, rojo
+ * cuando ya te pasaste. El ámbar es "hacé algo antes"; el rojo es "ya pasó".
+ */
 function barColor(status: MonotributoAlert['status'], c: Colors): string {
-  if (status === 'exceeded') return c.attention
+  if (status === 'exceeded') return c.danger
   if (status === 'warning') return c.attention
   return c.brand
 }
@@ -58,7 +61,7 @@ function TotalCard({
   label: string
   totalArs: number
   detail?: { currency: string; value: number }[]
-  tone?: 'ink' | 'positive'
+  tone?: Tone
   children?: React.ReactNode
 }) {
   const styles = useThemeStyles(makeStyles)
@@ -78,7 +81,7 @@ function TotalCard({
               <Txt variant="label" tone="faint">
                 {row.currency}
               </Txt>
-              <Money value={row.value} />
+              <Money value={row.value} tone={tone} />
             </View>
           ))}
         </View>
@@ -178,9 +181,14 @@ export default function ReportsScreen() {
             <TotalCard
               label="Gastaste"
               totalArs={summary.data.expenseArs}
+              tone="expense"
               detail={foreign('expense')}
             />
-            <TotalCard label="Te queda libre" totalArs={summary.data.netAfterTax}>
+            <TotalCard
+              label="Te queda libre"
+              totalArs={summary.data.netAfterTax}
+              tone={summary.data.netAfterTax < 0 ? 'expense' : 'ink'}
+            >
               <Txt variant="caption" tone="muted" style={styles.note}>
                 Menos la cuota de monotributo ({formatArs(summary.data.tax.monthlyFee)}
                 {summary.data.tax.category ? `, categoría ${summary.data.tax.category}` : ''})
@@ -233,18 +241,18 @@ export default function ReportsScreen() {
                     </View>
                     {alert.data.remaining !== null ? (
                       <View style={styles.remainingRow}>
-                        <Txt variant="label" tone="faint">
+                        <Txt variant="label" tone={alert.data.remaining < 0 ? 'danger' : 'faint'}>
                           {alert.data.remaining < 0 ? 'Excedido' : 'Te queda'}
                         </Txt>
                         <Money
                           value={Math.abs(alert.data.remaining)}
-                          tone={alert.data.remaining < 0 ? 'attention' : 'ink'}
+                          tone={alert.data.remaining < 0 ? 'danger' : 'ink'}
                         />
                       </View>
                     ) : null}
                   </>
                 ) : (
-                  <Txt variant="bodyMedium" tone="attention">
+                  <Txt variant="bodyMedium" tone="danger">
                     Te pasaste del techo de todas las categorías.
                   </Txt>
                 )}
