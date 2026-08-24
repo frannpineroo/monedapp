@@ -1,4 +1,4 @@
-import { colors, type } from '@/src/theme'
+import { useThemeColors, type } from '@/src/theme'
 import { Text as RNText, type TextProps, type TextStyle } from 'react-native'
 
 export type TypeVariant = keyof typeof type
@@ -9,21 +9,9 @@ export type Tone =
   | 'brand'
   | 'attention'
   | 'positive'
+  | 'expense'
   | 'danger'
-  | 'warning'
   | 'onBrand'
-
-const tones: Record<Tone, string> = {
-  ink: colors.ink,
-  muted: colors.muted,
-  faint: colors.faint,
-  brand: colors.brand,
-  attention: colors.attention,
-  positive: colors.positive,
-  danger: colors.danger,
-  warning: colors.warning,
-  onBrand: colors.onBrand,
-}
 
 export type TxtProps = TextProps & {
   variant?: TypeVariant
@@ -33,7 +21,24 @@ export type TxtProps = TextProps & {
 
 /** Único punto de entrada de texto: garantiza familia, escala y tono del sistema. */
 export function Txt({ variant = 'body', tone = 'ink', align, style, ...rest }: TxtProps) {
-  return <RNText {...rest} style={[type[variant], { color: tones[tone] }, align ? { textAlign: align } : null, style]} />
+  const c = useThemeColors()
+  const tones: Record<Tone, string> = {
+    ink: c.ink,
+    muted: c.muted,
+    faint: c.faint,
+    brand: c.brand,
+    attention: c.attention,
+    positive: c.positive,
+    expense: c.expense,
+    danger: c.danger,
+    onBrand: c.onBrand,
+  }
+  return (
+    <RNText
+      {...rest}
+      style={[type[variant], { color: tones[tone] }, align ? { textAlign: align } : null, style]}
+    />
+  )
 }
 
 /** Rótulo de sección en mayúsculas. */
