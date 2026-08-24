@@ -2,12 +2,12 @@ import { apiRequest } from '@/src/api/client'
 import type { MonotributoAlert, MonthlySummary, User } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatArs, formatPercent } from '@/src/lib/format'
-import { colors, radius, spacing } from '@/src/theme'
-import { Card, Chip, ChipRow, Money, Screen, Section, Txt } from '@/src/ui'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
+import { Card, Chip, ChipRow, Money, Screen, Section, ThemedRefreshControl, Txt } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native'
 
 function shiftMonth(month: string, delta: number): string {
   const [year, monthNumber] = month.split('-').map(Number)
@@ -24,15 +24,17 @@ function monthLabel(month: string): string {
   })
 }
 
-/** El techo del monotributo pide acción sólo cuando aprieta: hasta ahí, tinta neutra. */
-function barColor(status: MonotributoAlert['status']): string {
-  if (status === 'exceeded') return colors.attention
-  if (status === 'warning') return colors.warning
-  return colors.brand
+/** El techo del monotributo pide acción sólo cuando aprieta: hasta ahí, azul. */
+function barColor(status: MonotributoAlert['status'], c: Colors): string {
+  if (status === 'exceeded') return c.attention
+  if (status === 'warning') return c.attention
+  return c.brand
 }
 
 /** Flecha del selector de mes. Área de toque grande, sin fondo. */
 function MonthArrow({ name, onPress }: { name: 'chevron-left' | 'chevron-right'; onPress: () => void }) {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   return (
     <Pressable
       onPress={onPress}
@@ -40,7 +42,7 @@ function MonthArrow({ name, onPress }: { name: 'chevron-left' | 'chevron-right';
       hitSlop={8}
       style={({ pressed }) => [styles.arrow, pressed && styles.arrowPressed]}
     >
-      <Feather name={name} size={20} color={colors.muted} />
+      <Feather name={name} size={20} color={c.muted} />
     </Pressable>
   )
 }
@@ -59,6 +61,7 @@ function TotalCard({
   tone?: 'ink' | 'positive'
   children?: React.ReactNode
 }) {
+  const styles = useThemeStyles(makeStyles)
   return (
     <Card>
       <Txt variant="label" tone="faint">
@@ -86,6 +89,8 @@ function TotalCard({
 }
 
 export default function ReportsScreen() {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const { accessToken, setUser } = useAuth()
   const queryClient = useQueryClient()
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -132,15 +137,12 @@ export default function ReportsScreen() {
     <Screen
       scroll
       refreshControl={
-        <RefreshControl
+        <ThemedRefreshControl
           refreshing={summary.isFetching || alert.isFetching}
           onRefresh={() => {
             void summary.refetch()
             void alert.refetch()
           }}
-          tintColor={colors.muted}
-          colors={[colors.brand]}
-          progressBackgroundColor={colors.surface}
         />
       }
     >
@@ -163,7 +165,7 @@ export default function ReportsScreen() {
       ) : null}
 
       {summary.isLoading || !summary.data ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <ActivityIndicator color={c.brand} style={styles.loader} />
       ) : (
         <>
           <Section title="El mes" style={styles.cards}>
@@ -224,7 +226,7 @@ export default function ReportsScreen() {
                           styles.barFill,
                           {
                             width: `${Math.min(alert.data.percentUsed, 100)}%`,
-                            backgroundColor: barColor(alert.data.status),
+                            backgroundColor: barColor(alert.data.status, c),
                           },
                         ]}
                       />
@@ -272,46 +274,47 @@ export default function ReportsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  header: { marginBottom: spacing.lg },
-  monthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xl,
-  },
-  month: { flex: 1, textTransform: 'capitalize' },
-  arrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowPressed: { backgroundColor: colors.surfaceRaised },
-  cards: { gap: spacing.md },
-  detail: { marginTop: spacing.md, gap: spacing.xs },
-  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  note: { marginTop: spacing.sm },
-  clientRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  clientRowSpaced: { marginTop: spacing.md },
-  clientName: { flex: 1 },
-  barTrack: {
-    height: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSunken,
-    overflow: 'hidden',
-    marginTop: spacing.md,
-  },
-  barFill: { height: 8, borderRadius: radius.pill },
-  remainingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-  },
-  chipsLabel: { marginTop: spacing.xl, marginBottom: spacing.sm },
-  chipsHint: { marginTop: spacing.sm },
-  loader: { marginTop: spacing.xxxl },
-  error: { marginBottom: spacing.lg },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    header: { marginBottom: spacing.lg },
+    monthRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.xl,
+    },
+    month: { flex: 1, textTransform: 'capitalize' },
+    arrow: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    arrowPressed: { backgroundColor: c.surfaceRaised },
+    cards: { gap: spacing.md },
+    detail: { marginTop: spacing.md, gap: spacing.xs },
+    detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    note: { marginTop: spacing.sm },
+    clientRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+    clientRowSpaced: { marginTop: spacing.md },
+    clientName: { flex: 1 },
+    barTrack: {
+      height: 8,
+      borderRadius: radius.pill,
+      backgroundColor: c.surfaceSunken,
+      overflow: 'hidden',
+      marginTop: spacing.md,
+    },
+    barFill: { height: 8, borderRadius: radius.pill },
+    remainingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.md,
+    },
+    chipsLabel: { marginTop: spacing.xl, marginBottom: spacing.sm },
+    chipsHint: { marginTop: spacing.sm },
+    loader: { marginTop: spacing.xxxl },
+    error: { marginBottom: spacing.lg },
+  })
