@@ -1,16 +1,22 @@
 import { apiRequest } from '@/src/api/client'
 import type { Category, Client, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
-import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
-import { Button, Screen, Section, Txt } from '@/src/ui'
+import { radius, spacing, useTheme, useThemeStyles, type Colors, type ThemePreference } from '@/src/theme'
+import { Button, Chip, ChipRow, Screen, Section, Txt } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, type Href } from 'expo-router'
 import { Pressable, StyleSheet, View } from 'react-native'
 
+const themeOptions: { id: ThemePreference; label: string }[] = [
+  { id: 'system', label: 'Automático' },
+  { id: 'light', label: 'Claro' },
+  { id: 'dark', label: 'Oscuro' },
+]
+
 export default function SettingsScreen() {
   const styles = useThemeStyles(makeStyles)
-  const c = useThemeColors()
+  const { preference, setPreference, colors: c } = useTheme()
   const { accessToken, user, logout } = useAuth()
   const router = useRouter()
 
@@ -71,6 +77,22 @@ export default function SettingsScreen() {
         </View>
       </Section>
 
+      <Section title="Apariencia">
+        <ChipRow>
+          {themeOptions.map((option) => (
+            <Chip
+              key={option.id}
+              label={option.label}
+              selected={preference === option.id}
+              onPress={() => setPreference(option.id)}
+            />
+          ))}
+        </ChipRow>
+        <Txt variant="caption" tone="faint" style={styles.appearanceHint}>
+          Automático sigue el ajuste de tu teléfono.
+        </Txt>
+      </Section>
+
       <Section title="Cuenta">
         <View style={styles.card}>
           <View style={[styles.row, styles.rowBorder]}>
@@ -114,4 +136,5 @@ const makeStyles = (c: Colors) =>
     rowPressed: { backgroundColor: c.surfaceRaised },
     rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     logoutRow: { padding: spacing.lg },
+    appearanceHint: { marginTop: spacing.xs },
   })
