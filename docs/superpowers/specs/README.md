@@ -16,5 +16,5 @@ Un archivo por spec aprobado. Ninguno está implementado todavía. El orden de e
 ## Convenciones
 
 - Los specs asumen las convenciones del código actual: rutas Express con `asyncHandler` y validación inline que lanza `AppError(400, 'mensaje en español')`, lógica en `backend/src/services/`, respuestas por `backend/src/lib/serializers.ts`, tests con Vitest + Supertest contra Postgres real.
-- En la app: Expo Router, `useQuery`/`useMutation` inline por pantalla, `StyleSheet.create` local y `colors` de `mobile/src/theme.ts`. Antes de escribir código de app, leer los docs versionados de Expo SDK 57 (`https://docs.expo.dev/versions/v57.0.0/`), según [mobile/AGENTS.md](../../../mobile/AGENTS.md).
+- En la app: Expo Router, `useQuery`/`useMutation` inline por pantalla, y estilos con `useThemeStyles(makeStyles)` leyendo el color del `ThemeProvider` de `mobile/src/theme/`. No existe un `colors` importable. Antes de escribir código de app, leer los docs versionados de Expo SDK 57 (`https://docs.expo.dev/versions/v57.0.0/`), según [mobile/AGENTS.md](../../../mobile/AGENTS.md).
 - Cada spec dice explícitamente qué queda fuera de alcance. Si algo no está ni en el spec ni en el backlog del roadmap, no está decidido.
