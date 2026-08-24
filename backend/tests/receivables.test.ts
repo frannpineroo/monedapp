@@ -243,6 +243,31 @@ describe('POST /movements type collection', () => {
     const usd = wallets.find((w) => w.currency === 'USD')!
     const invoice = await issueInvoice(token, client.id, 1000, 'USD')
 
+    // La cotización de hoy se fija acá a propósito. Sin esto el test depende de
+    // lo que haya en la base: contra una base con historial de dolarapi pasa,
+    // pero contra una recién migrada `ensureRateForDate` cae al fallback y
+    // levanta los mismos 900 que este test siembra abajo, la diferencia da
+    // cero y no hay pata de FX. Un `source` distinto de 'stub' corta en el
+    // paso de caché y no toca la red.
+    const today = new Date()
+    await prisma.exchangeRate.upsert({
+      where: {
+        date_type_currency: {
+          date: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())),
+          type: 'blue',
+          currency: 'USD',
+        },
+      },
+      create: {
+        currency: 'USD',
+        type: 'blue',
+        date: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())),
+        value: 1500,
+        source: 'test',
+      },
+      update: { value: 1500, source: 'test' },
+    })
+
     // La factura se selló con una cotización más baja que la de hoy: cobrarla en
     // la misma moneda igual mueve el valor en ARS de la deuda.
     const oldRateDate = new Date(Date.UTC(2026, 0, 2))
