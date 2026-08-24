@@ -6,5 +6,5 @@ COPY prisma.config.ts .
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 RUN npm install
 COPY . .
-EXPOSE 8000
+EXPOSE 8100
 CMD ["npm", "run", "dev"]

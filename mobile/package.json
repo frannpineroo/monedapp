@@ -31,10 +31,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "expo start --port 8181",
+    "android": "expo start --android --port 8181",
+    "ios": "expo start --ios --port 8181",
+    "web": "expo start --web --port 8181"
   },
   "private": true
 }

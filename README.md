@@ -7,7 +7,7 @@ Spec: [`monedapp_spec.md`](./monedapp_spec.md) · Plan: [`IMPLEMENTATION_PLAN.md
 
 - **Backend:** Node 22 + Express + TypeScript + Prisma 7 + PostgreSQL
 - **Mobile:** Expo (React Native) + TanStack Query + StyleSheet
-- **Infra local:** Docker Compose (Postgres en `localhost:5433`)
+- **Infra local:** Docker Compose (Postgres en `localhost:5433`, API en `:8100`)
 
 ## Setup rápido
 
@@ -34,7 +34,7 @@ npm run db:seed
 ```bash
 cd backend
 npm run dev
-# → http://localhost:8000/health
+# → http://localhost:8100/health
 ```
 
 ### Datos de demo
@@ -68,16 +68,18 @@ npm test
 ```bash
 cd mobile
 npm install
-npx expo start
+npm start
+# → http://localhost:8181
 ```
 
-- iOS Simulator: usa `http://localhost:8000`
-- Android Emulator: usa `http://10.0.2.2:8000` (ya configurado)
-- Device físico: `EXPO_PUBLIC_API_URL=http://<tu-ip-lan>:8000 npx expo start`
+- iOS Simulator: usa `http://localhost:8100`
+- Android Emulator: usa `http://10.0.2.2:8100` (ya configurado)
+- Device físico: `EXPO_PUBLIC_API_URL=http://<tu-ip-lan>:8100 npx expo start`
+- Metro: `http://localhost:8181` (puerto propio para no chocar con otros proyectos)
 
 ## Smoke checklist
 
-1. `curl http://localhost:8000/health` → `{ "status": "ok" }`
+1. `curl http://localhost:8100/health` → `{ "status": "ok" }`
 2. Registrar usuario: `POST /auth/register`
 3. Onboarding: `POST /users/me/onboarding` con `freelancer_software`
 4. `GET /wallets` → billeteras ARS y USD
