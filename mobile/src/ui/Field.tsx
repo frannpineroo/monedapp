@@ -1,4 +1,4 @@
-import { colors, radius, spacing, type } from '@/src/theme'
+import { radius, spacing, type, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { forwardRef } from 'react'
 import { StyleSheet, TextInput, View, type TextInputProps, type StyleProp, type ViewStyle } from 'react-native'
 import { Txt } from './Text'
@@ -14,6 +14,8 @@ export const Field = forwardRef<TextInput, Props>(function Field(
   { label, hint, error, containerStyle, style, ...rest },
   ref
 ) {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   return (
     <View style={[styles.container, containerStyle]}>
       {label ? (
@@ -23,8 +25,8 @@ export const Field = forwardRef<TextInput, Props>(function Field(
       ) : null}
       <TextInput
         ref={ref}
-        placeholderTextColor={colors.faint}
-        selectionColor={colors.brand}
+        placeholderTextColor={c.faint}
+        selectionColor={c.brand}
         {...rest}
         style={[styles.input, error ? styles.inputError : null, style]}
       />
@@ -41,18 +43,19 @@ export const Field = forwardRef<TextInput, Props>(function Field(
   )
 })
 
-const styles = StyleSheet.create({
-  container: { gap: spacing.sm },
-  input: {
-    ...type.body,
-    backgroundColor: colors.surfaceSunken,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    color: colors.ink,
-    minHeight: 48,
-  },
-  inputError: { borderColor: colors.attentionEdge },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    container: { gap: spacing.sm },
+    input: {
+      ...type.body,
+      backgroundColor: c.surfaceSunken,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      color: c.ink,
+      minHeight: 48,
+    },
+    inputError: { borderColor: c.danger },
+  })

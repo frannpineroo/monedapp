@@ -1,4 +1,4 @@
-import { colors, radius, spacing } from '@/src/theme'
+import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Txt, type Tone } from './Text'
 
@@ -36,6 +36,8 @@ export function Button({
   style,
   left,
 }: Props) {
+  const styles = useThemeStyles(makeStyles)
+  const c = useThemeColors()
   const inactive = disabled || loading
 
   return (
@@ -49,13 +51,13 @@ export function Button({
         size === 'lg' ? styles.lg : styles.md,
         styles[variant],
         block && styles.block,
-        pressed && !inactive && pressedStyles[variant],
+        pressed && !inactive && styles[`${variant}Pressed` as const],
         inactive && styles.disabled,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.onBrand : colors.brand} />
+        <ActivityIndicator color={variant === 'primary' ? c.onBrand : c.brand} />
       ) : (
         <View style={styles.inner}>
           {left}
@@ -68,31 +70,31 @@ export function Button({
   )
 }
 
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'transparent',
-  },
-  inner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  md: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 44 },
-  lg: { paddingVertical: spacing.lg, paddingHorizontal: spacing.xl, minHeight: 52 },
-  block: { alignSelf: 'stretch' },
-  primary: { backgroundColor: colors.brand },
-  secondary: { backgroundColor: colors.surface, borderColor: colors.border },
-  ghost: { backgroundColor: 'transparent' },
-  destructive: { backgroundColor: 'transparent', borderColor: colors.attentionEdge },
-  disabled: { opacity: 0.45 },
-})
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    base: {
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: 'transparent',
+    },
+    inner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    md: { paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 44 },
+    lg: { paddingVertical: spacing.lg, paddingHorizontal: spacing.xl, minHeight: 52 },
+    block: { alignSelf: 'stretch' },
+    disabled: { opacity: 0.45 },
 
-const pressedStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.brandPressed },
-  secondary: { backgroundColor: colors.surfaceRaised },
-  ghost: { opacity: 0.6 },
-  destructive: { backgroundColor: colors.attentionSoft },
-})
+    primary: { backgroundColor: c.brand },
+    secondary: { backgroundColor: c.surface, borderColor: c.border },
+    ghost: { backgroundColor: 'transparent' },
+    destructive: { backgroundColor: 'transparent', borderColor: c.danger },
+
+    primaryPressed: { backgroundColor: c.brandPressed },
+    secondaryPressed: { backgroundColor: c.surfaceRaised },
+    ghostPressed: { opacity: 0.6 },
+    destructivePressed: { backgroundColor: c.dangerSoft },
+  })
 
 /** Texto pulsable para acciones secundarias en encabezados de sección. */
 export function LinkButton({ label, onPress }: { label: string; onPress: () => void }) {
@@ -107,6 +109,7 @@ export function LinkButton({ label, onPress }: { label: string; onPress: () => v
   )
 }
 
+// Sin color: no depende del tema y se queda a nivel de módulo.
 const linkStyles = StyleSheet.create({
   pressed: { opacity: 0.6 },
 })
