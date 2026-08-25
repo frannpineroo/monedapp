@@ -2,7 +2,7 @@ import { ApiError, apiRequest } from '@/src/api/client'
 import type { Wallet, WalletBalance } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { spacing, useThemeColors } from '@/src/theme'
-import { Button, Chip, ChipRow, EmptyState, Field, LedgerCell, ListRow, Screen, Sheet, ThemedRefreshControl, Txt } from '@/src/ui'
+import { Button, EmptyState, Field, LedgerCell, ListRow, Screen, Select, Sheet, ThemedRefreshControl, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -149,16 +149,13 @@ export default function WalletsScreen() {
             La moneda ({editing.currency}) no se puede cambiar.
           </Txt>
         ) : (
-          <View style={styles.group}>
-            <Txt variant="label" tone="faint">
-              Moneda
-            </Txt>
-            <ChipRow>
-              {['ARS', 'USD', 'USDT'].map((c) => (
-                <Chip key={c} label={c} selected={currency === c} onPress={() => setCurrency(c)} />
-              ))}
-            </ChipRow>
-          </View>
+          <Select
+            nested
+            label="Moneda"
+            value={currency}
+            options={['ARS', 'USD', 'USDT'].map((code) => ({ value: code, label: code }))}
+            onChange={setCurrency}
+          />
         )}
 
         <Button label="Guardar" size="lg" block loading={save.isPending} onPress={submit} />
