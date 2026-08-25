@@ -1,6 +1,14 @@
 import { radius, spacing, useThemeStyles, type Colors } from '@/src/theme'
 import type { ReactNode } from 'react'
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { Txt } from './Text'
 
 type Props = {
@@ -8,10 +16,12 @@ type Props = {
   title: string
   onClose: () => void
   children: ReactNode
+  /** Envuelve el cuerpo en un ScrollView. Para listas largas de opciones. */
+  scroll?: boolean
 }
 
 /** Hoja inferior para altas y ediciones. Se cierra tocando fuera. */
-export function Sheet({ visible, title, onClose, children }: Props) {
+export function Sheet({ visible, title, onClose, children, scroll }: Props) {
   const styles = useThemeStyles(makeStyles)
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -23,7 +33,17 @@ export function Sheet({ visible, title, onClose, children }: Props) {
             <Txt variant="heading" style={styles.title}>
               {title}
             </Txt>
-            {children}
+            {scroll ? (
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+              >
+                {children}
+              </ScrollView>
+            ) : (
+              children
+            )}
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -45,7 +65,10 @@ const makeStyles = (c: Colors) =>
       paddingTop: spacing.md,
       paddingBottom: spacing.xxxl,
       gap: spacing.lg,
+      // Sin techo, una lista de 12 categorías se sale de la pantalla.
+      maxHeight: '90%',
     },
+    scrollContent: { paddingBottom: spacing.sm },
     handle: {
       width: 36,
       height: 4,
