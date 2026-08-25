@@ -1,6 +1,5 @@
 export { Button, LinkButton, type ButtonVariant } from './Button'
 export { Card } from './Card'
-export { Chip, ChipRow } from './Chip'
 export { Field } from './Field'
 export { ListRow, RowDivider } from './ListRow'
 export { LedgerCell, Money } from './Money'

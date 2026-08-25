@@ -2,7 +2,7 @@ import { apiRequest } from '@/src/api/client'
 import type { Category, Client, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { radius, spacing, useTheme, useThemeStyles, type Colors, type ThemePreference } from '@/src/theme'
-import { Button, Chip, ChipRow, Screen, Section, Txt } from '@/src/ui'
+import { Button, Screen, Section, Select, Txt } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, type Href } from 'expo-router'
@@ -78,16 +78,12 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title="Apariencia">
-        <ChipRow>
-          {themeOptions.map((option) => (
-            <Chip
-              key={option.id}
-              label={option.label}
-              selected={preference === option.id}
-              onPress={() => setPreference(option.id)}
-            />
-          ))}
-        </ChipRow>
+        <Select
+          label="Tema"
+          value={preference}
+          options={themeOptions.map((option) => ({ value: option.id, label: option.label }))}
+          onChange={setPreference}
+        />
         <Txt variant="caption" tone="faint" style={styles.appearanceHint}>
           Automático sigue el ajuste de tu teléfono.
         </Txt>
