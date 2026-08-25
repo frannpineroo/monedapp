@@ -2,7 +2,7 @@ import { apiRequest } from '@/src/api/client'
 import type { Category, Client, ExchangeRate, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { radius, spacing, type, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
-import { Button, Chip, ChipRow, Field, Screen, Txt } from '@/src/ui'
+import { Button, Field, Screen, Select, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
@@ -17,18 +17,8 @@ const typeOptions: { id: MovementType; label: string }[] = [
   { id: 'invoice', label: 'Factura' },
 ]
 
-/** Grupo de opciones: rótulo arriba, chips debajo. */
-function Group({ label, children }: { label: string; children: React.ReactNode }) {
-  const styles = useThemeStyles(makeStyles)
-  return (
-    <View style={styles.group}>
-      <Txt variant="label" tone="faint">
-        {label}
-      </Txt>
-      <ChipRow>{children}</ChipRow>
-    </View>
-  )
-}
+/** `null` no puede ser el value de una opción: este centinela lo representa. */
+const SIN_CLIENTE = '__none__'
 
 export default function NewMovementScreen() {
   const styles = useThemeStyles(makeStyles)
@@ -269,16 +259,12 @@ export default function NewMovementScreen() {
         Nuevo movimiento
       </Txt>
 
-      <ChipRow style={styles.typeRow}>
-        {typeOptions.map((opt) => (
-          <Chip
-            key={opt.id}
-            label={opt.label}
-            selected={type === opt.id}
-            onPress={() => selectType(opt.id)}
-          />
-        ))}
-      </ChipRow>
+      <Select
+        label="Tipo"
+        value={type}
+        options={typeOptions.map((opt) => ({ value: opt.id, label: opt.label }))}
+        onChange={selectType}
+      />
 
       {/* El monto encabeza la carga: primero el número, después el contexto. */}
       <View style={styles.amountCard}>
@@ -312,16 +298,12 @@ export default function NewMovementScreen() {
 
       {type === 'invoice' ? (
         <>
-          <Group label="Moneda">
-            {['ARS', 'USD', 'USDT'].map((c) => (
-              <Chip
-                key={c}
-                label={c}
-                selected={invoiceCurrency === c}
-                onPress={() => setInvoiceCurrency(c)}
-              />
-            ))}
-          </Group>
+          <Select
+            label="Moneda"
+            value={invoiceCurrency}
+            options={['ARS', 'USD', 'USDT'].map((code) => ({ value: code, label: code }))}
+            onChange={setInvoiceCurrency}
+          />
           <Field
             label="Vence el"
             placeholder="2026-09-14"
@@ -332,51 +314,41 @@ export default function NewMovementScreen() {
           />
         </>
       ) : (
-        <Group label={type === 'transfer' ? 'Desde' : 'Billetera'}>
-          {(wallets.data ?? []).map((w) => (
-            <Chip
-              key={w.id}
-              label={w.name}
-              selected={selectedWalletId === w.id}
-              onPress={() => setWalletId(w.id)}
-            />
-          ))}
-        </Group>
+        <Select
+          label={type === 'transfer' ? 'Desde' : 'Billetera'}
+          value={selectedWalletId ?? null}
+          options={(wallets.data ?? []).map((w) => ({
+            value: w.id,
+            label: w.name,
+            meta: w.currency,
+          }))}
+          onChange={setWalletId}
+        />
       )}
 
       {type === 'transfer' ? (
-        <Group label="Hacia">
-          {otherWallets.map((w) => (
-            <Chip
-              key={w.id}
-              label={w.name}
-              selected={toWalletId === w.id}
-              onPress={() => setToWalletId(w.id)}
-            />
-          ))}
-        </Group>
+        <Select
+          label="Hacia"
+          value={toWalletId}
+          options={otherWallets.map((w) => ({ value: w.id, label: w.name, meta: w.currency }))}
+          onChange={setToWalletId}
+        />
       ) : null}
 
       {type === 'income' || type === 'invoice' ? (
         <>
-          <Group label={type === 'invoice' ? 'Cliente' : 'Cliente (opcional)'}>
-            {type === 'income' ? (
-              <Chip label="Sin cliente" selected={clientId === null} onPress={() => setClientId(null)} />
-            ) : null}
-            {(clients.data ?? []).map((c) => (
-              <Chip
-                key={c.id}
-                label={c.name}
-                selected={clientId === c.id}
-                onPress={() => setClientId(c.id)}
-              />
-            ))}
-            <Chip
-              label="Nuevo cliente"
-              selected={showNewClient}
-              onPress={() => setShowNewClient((v) => !v)}
-            />
-          </Group>
+          <Select
+            label={type === 'invoice' ? 'Cliente' : 'Cliente (opcional)'}
+            // En factura el cliente es obligatorio: sin la opción "Sin cliente",
+            // el placeholder empuja a elegir uno.
+            value={type === 'income' ? (clientId ?? SIN_CLIENTE) : clientId}
+            options={[
+              ...(type === 'income' ? [{ value: SIN_CLIENTE, label: 'Sin cliente' }] : []),
+              ...(clients.data ?? []).map((client) => ({ value: client.id, label: client.name })),
+            ]}
+            onChange={(next) => setClientId(next === SIN_CLIENTE ? null : next)}
+            footerAction={{ label: 'Nuevo cliente', onPress: () => setShowNewClient(true) }}
+          />
           {showNewClient ? (
             <View style={styles.inlineCreate}>
               <Field
@@ -398,21 +370,13 @@ export default function NewMovementScreen() {
 
       {type !== 'transfer' ? (
         <>
-          <Group label="Categoría">
-            {(categories.data ?? []).map((c) => (
-              <Chip
-                key={c.id}
-                label={c.name}
-                selected={categoryId === c.id}
-                onPress={() => setCategoryId(c.id)}
-              />
-            ))}
-            <Chip
-              label="Nueva categoría"
-              selected={showNewCategory}
-              onPress={() => setShowNewCategory((v) => !v)}
-            />
-          </Group>
+          <Select
+            label="Categoría"
+            value={categoryId}
+            options={(categories.data ?? []).map((cat) => ({ value: cat.id, label: cat.name }))}
+            onChange={setCategoryId}
+            footerAction={{ label: 'Nueva categoría', onPress: () => setShowNewCategory(true) }}
+          />
           {showNewCategory ? (
             <View style={styles.inlineCreate}>
               <Field
@@ -433,18 +397,17 @@ export default function NewMovementScreen() {
       ) : null}
 
       {currency !== 'ARS' && (rates.data ?? []).length > 0 ? (
-        <Group label="Cotización">
-          {(rates.data ?? []).map((r) => (
-            <Chip
-              key={r.id}
-              label={`${r.type} ${Number(r.sell ?? r.value).toLocaleString('es-AR', {
-                maximumFractionDigits: 0,
-              })}`}
-              selected={activeRate?.id === r.id}
-              onPress={() => setRateType(r.type)}
-            />
-          ))}
-        </Group>
+        <Select
+          label="Cotización"
+          value={activeRate?.type ?? null}
+          options={(rates.data ?? []).map((r) => ({
+            value: r.type,
+            label: `${r.type} ${Number(r.sell ?? r.value).toLocaleString('es-AR', {
+              maximumFractionDigits: 0,
+            })}`,
+          }))}
+          onChange={setRateType}
+        />
       ) : null}
 
       {error ? (
@@ -461,7 +424,6 @@ export default function NewMovementScreen() {
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     title: { marginBottom: spacing.lg },
-    typeRow: { marginBottom: spacing.xl },
     amountCard: {
       backgroundColor: c.surface,
       borderRadius: radius.lg,
@@ -477,7 +439,6 @@ const makeStyles = (c: Colors) =>
       paddingVertical: spacing.xs,
     },
     field: { marginBottom: spacing.xl },
-    group: { gap: spacing.sm, marginBottom: spacing.xl },
     inlineCreate: {
       flexDirection: 'row',
       alignItems: 'flex-start',
