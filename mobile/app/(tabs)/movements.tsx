@@ -179,7 +179,7 @@ export default function MovementsScreen() {
                 title="Sin movimientos todavía"
                 body="Cargá el primero y aparece acá."
                 actionLabel="Cargar movimiento"
-                onAction={() => router.push('/(tabs)/new-movement')}
+                onAction={() => router.push('/new-movement')}
               />
             )
           }

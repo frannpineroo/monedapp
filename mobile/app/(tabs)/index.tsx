@@ -274,7 +274,7 @@ export default function HomeScreen() {
                 title="Sin movimientos todavía"
                 body="Cargá el primero y aparece acá."
                 actionLabel="Cargar movimiento"
-                onAction={() => router.push('/(tabs)/new-movement')}
+                onAction={() => router.push('/new-movement')}
               />
             ) : (
               <View style={styles.movements}>
@@ -303,7 +303,7 @@ export default function HomeScreen() {
             label="Cargar movimiento"
             block
             size="lg"
-            onPress={() => router.push('/(tabs)/new-movement')}
+            onPress={() => router.push('/new-movement')}
           />
         </>
       )}

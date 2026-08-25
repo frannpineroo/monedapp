@@ -1,5 +1,5 @@
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext'
-import { fonts, ThemeProvider as AppThemeProvider, type, useTheme } from '@/src/theme'
+import { fonts, radius, ThemeProvider as AppThemeProvider, type, useTheme } from '@/src/theme'
 import {
   Archivo_400Regular,
   Archivo_500Medium,
@@ -103,6 +103,17 @@ function ThemedApp() {
           <Stack.Screen name="integrations" options={{ ...stackHeader, title: 'Integraciones' }} />
           <Stack.Screen name="movement/[id]" options={{ ...stackHeader, title: 'Movimiento' }} />
           <Stack.Screen name="receivables" options={{ ...stackHeader, title: 'Te deben' }} />
+          <Stack.Screen
+            name="new-movement"
+            options={{
+              presentation: 'formSheet',
+              // Un solo detent al 94%: se ve que hay pantalla detrás. No usar
+              // 'fitToContents': el form tiene teclado y flex: 1.
+              sheetAllowedDetents: [0.94],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: radius.xxl,
+            }}
+          />
         </Stack>
       </AuthGate>
     </ThemeProvider>

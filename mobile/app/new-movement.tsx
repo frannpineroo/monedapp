@@ -166,7 +166,9 @@ export default function NewMovementScreen() {
       setClientId(null)
       setCategoryId(null)
       setDueDate('')
-      router.push('/(tabs)/movements')
+      // Cierra el form sheet y devuelve al usuario a donde estaba. No lo
+      // mandamos a otra tab: el alta es una interrupción, no un destino.
+      router.back()
     },
     onError: (e) => {
       setError(e instanceof Error ? e.message : 'No se pudo guardar')

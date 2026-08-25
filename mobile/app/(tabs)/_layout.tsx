@@ -4,8 +4,9 @@ import { useAuth } from '@/src/auth/AuthContext'
 import { fonts, radius, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import Feather from '@expo/vector-icons/Feather'
 import { useQuery } from '@tanstack/react-query'
+import { useRouter } from 'expo-router'
 import { Tabs } from 'expo-router/js-tabs'
-import { StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 
 type FeatherName = React.ComponentProps<typeof Feather>['name']
 
@@ -27,6 +28,7 @@ function NewMovementIcon({ focused }: { focused: boolean }) {
 export default function TabLayout() {
   const styles = useThemeStyles(makeStyles)
   const c = useThemeColors()
+  const router = useRouter()
   const { accessToken } = useAuth()
   const pending = useQuery({
     queryKey: ['movements', { needsReview: true }],
@@ -62,9 +64,23 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="new-movement"
+        name="new"
         options={{
           title: 'Nuevo',
+          // El `+` no selecciona una tab: presenta /new-movement como form
+          // sheet y deja la pantalla de fondo donde estaba. Se hace con
+          // tabBarButton porque Tabs.Screen de expo-router no acepta
+          // `listeners`: su tipo es { name, initialParams, options }.
+          tabBarButton: (props) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cargar movimiento"
+              onPress={() => router.push('/new-movement')}
+              style={styles.newButton}
+            >
+              {props.children}
+            </Pressable>
+          ),
           tabBarIcon: ({ focused }) => <NewMovementIcon focused={focused} />,
         }}
       />
@@ -116,4 +132,6 @@ const makeStyles = (c: Colors) =>
       justifyContent: 'center',
     },
     newIconFocused: { backgroundColor: c.brand },
+    // Ocupa su celda como cualquier tab, pero no selecciona nada.
+    newButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   })
