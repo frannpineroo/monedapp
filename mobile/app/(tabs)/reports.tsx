@@ -3,7 +3,7 @@ import type { MonotributoAlert, MonthlySummary, User } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatArs, formatPercent } from '@/src/lib/format'
 import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
-import { Card, Chip, ChipRow, Money, Screen, Section, ThemedRefreshControl, Txt, type Tone } from '@/src/ui'
+import { Card, Money, Screen, Section, Select, ThemedRefreshControl, Txt, type Tone } from '@/src/ui'
 import Feather from '@expo/vector-icons/Feather'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -257,20 +257,20 @@ export default function ReportsScreen() {
                   </Txt>
                 )}
 
-                <Txt variant="label" tone="faint" style={styles.chipsLabel}>
-                  Tu categoría
-                </Txt>
-                <ChipRow>
-                  {alert.data.scales.map((scale) => (
-                    <Chip
-                      key={scale.category}
-                      label={scale.category}
-                      selected={alert.data?.category === scale.category}
-                      onPress={() => setCategory.mutate(scale.category)}
-                    />
-                  ))}
-                </ChipRow>
-                <Txt variant="caption" tone="faint" style={styles.chipsHint}>
+                <View style={styles.categoryPicker}>
+                  <Select
+                    label="Tu categoría"
+                    value={alert.data.category}
+                    options={alert.data.scales.map((scale) => ({
+                      value: scale.category,
+                      label: scale.category,
+                      // El techo anual es lo que decide la categoría: va al lado.
+                      meta: `hasta ${formatArs(scale.annualGrossLimit)} al año`,
+                    }))}
+                    onChange={(next) => setCategory.mutate(next)}
+                  />
+                </View>
+                <Txt variant="caption" tone="faint" style={styles.categoryHint}>
                   La cuota de la categoría elegida es la que se descuenta arriba.
                 </Txt>
               </Card>
@@ -321,8 +321,8 @@ const makeStyles = (c: Colors) =>
       justifyContent: 'space-between',
       marginTop: spacing.md,
     },
-    chipsLabel: { marginTop: spacing.xl, marginBottom: spacing.sm },
-    chipsHint: { marginTop: spacing.sm },
+    categoryPicker: { marginTop: spacing.xl },
+    categoryHint: { marginTop: spacing.sm },
     loader: { marginTop: spacing.xxxl },
     error: { marginBottom: spacing.lg },
   })

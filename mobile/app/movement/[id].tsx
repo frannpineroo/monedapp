@@ -3,12 +3,15 @@ import type { Client, Movement, Receivable, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { formatAmount, signForType, toneForType } from '@/src/lib/format'
 import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
-import { Button, Chip, ChipRow, Field, Money, Screen, Txt } from '@/src/ui'
+import { Button, Field, Money, Screen, Select, Txt } from '@/src/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as Linking from 'expo-linking'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
+
+/** `null` no puede ser el value de una opción: este centinela lo representa. */
+const SIN_CLIENTE = '__none__'
 
 const typeLabel: Record<Movement['type'], string> = {
   income: 'Ingreso',
@@ -177,20 +180,15 @@ export default function MovementDetailScreen() {
 
       {isIncome ? (
         <View style={styles.group}>
-          <Txt variant="label" tone="faint">
-            Cliente
-          </Txt>
-          <ChipRow>
-            <Chip label="Sin cliente" selected={clientId === null} onPress={() => setClientId(null)} />
-            {(clients.data ?? []).map((c) => (
-              <Chip
-                key={c.id}
-                label={c.name}
-                selected={clientId === c.id}
-                onPress={() => setClientId(c.id)}
-              />
-            ))}
-          </ChipRow>
+          <Select
+            label="Cliente"
+            value={clientId ?? SIN_CLIENTE}
+            options={[
+              { value: SIN_CLIENTE, label: 'Sin cliente' },
+              ...(clients.data ?? []).map((client) => ({ value: client.id, label: client.name })),
+            ]}
+            onChange={(next) => setClientId(next === SIN_CLIENTE ? null : next)}
+          />
         </View>
       ) : null}
 
@@ -222,19 +220,16 @@ export default function MovementDetailScreen() {
           {receivable.data.status !== 'paid' ? (
             <>
               <View style={styles.group}>
-                <Txt variant="label" tone="faint">
-                  Cobrar en
-                </Txt>
-                <ChipRow>
-                  {(wallets.data ?? []).map((w) => (
-                    <Chip
-                      key={w.id}
-                      label={w.name}
-                      selected={collectWalletId === w.id}
-                      onPress={() => setCollectWalletId(w.id)}
-                    />
-                  ))}
-                </ChipRow>
+                <Select
+                  label="Cobrar en"
+                  value={collectWalletId}
+                  options={(wallets.data ?? []).map((w) => ({
+                    value: w.id,
+                    label: w.name,
+                    meta: w.currency,
+                  }))}
+                  onChange={setCollectWalletId}
+                />
               </View>
 
               <Field
