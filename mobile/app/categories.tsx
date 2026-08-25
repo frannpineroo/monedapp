@@ -2,7 +2,7 @@ import { ApiError, apiRequest } from '@/src/api/client'
 import type { Category } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { spacing, useThemeColors } from '@/src/theme'
-import { Button, Chip, ChipRow, EmptyState, Field, ListRow, Screen, Sheet, ThemedRefreshControl } from '@/src/ui'
+import { Button, EmptyState, Field, ListRow, Screen, Select, Sheet, ThemedRefreshControl } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -105,10 +105,15 @@ export default function CategoriesScreen() {
       footer={<Button label="Nueva categoría" size="lg" block onPress={openCreate} />}
     >
       <View style={styles.filters}>
-        <ChipRow>
-          <Chip label="Gastos" selected={kind === 'EXPENSE'} onPress={() => setKind('EXPENSE')} />
-          <Chip label="Ingresos" selected={kind === 'INCOME'} onPress={() => setKind('INCOME')} />
-        </ChipRow>
+        <Select
+          label="Tipo"
+          value={kind}
+          options={[
+            { value: 'EXPENSE', label: 'Gastos' },
+            { value: 'INCOME', label: 'Ingresos' },
+          ]}
+          onChange={setKind}
+        />
       </View>
 
       {categories.isLoading ? (

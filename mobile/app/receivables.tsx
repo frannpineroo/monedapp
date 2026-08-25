@@ -2,7 +2,7 @@ import { apiRequest } from '@/src/api/client'
 import type { Receivable, ReceivableStatus } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { spacing, useThemeColors } from '@/src/theme'
-import { Chip, ChipRow, EmptyState, LedgerCell, ListRow, Screen, ThemedRefreshControl } from '@/src/ui'
+import { EmptyState, LedgerCell, ListRow, Screen, Select, ThemedRefreshControl } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
@@ -50,16 +50,12 @@ export default function ReceivablesScreen() {
   return (
     <Screen edges={['bottom']}>
       <View style={styles.filters}>
-        <ChipRow>
-          {filterOptions.map((opt) => (
-            <Chip
-              key={opt.id}
-              label={opt.label}
-              selected={filter === opt.id}
-              onPress={() => setFilter(opt.id)}
-            />
-          ))}
-        </ChipRow>
+        <Select
+          label="Estado"
+          value={filter}
+          options={filterOptions.map((opt) => ({ value: opt.id, label: opt.label }))}
+          onChange={setFilter}
+        />
       </View>
 
       {receivables.isLoading ? (
