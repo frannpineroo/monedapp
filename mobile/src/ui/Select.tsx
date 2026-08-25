@@ -1,7 +1,7 @@
 import { radius, spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
 import Feather from '@expo/vector-icons/Feather'
 import { useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { LinkButton } from './Button'
 import { Sheet } from './Sheet'
 import { Txt } from './Text'
@@ -22,6 +22,12 @@ type Props<T extends string> = {
   placeholder?: string
   /** Acción extra al pie de la lista (ej. "Nueva categoría"). */
   footerAction?: { label: string; onPress: () => void }
+  /**
+   * Dentro de un Sheet ya abierto. Despliega las opciones en línea en vez de
+   * montar un segundo Modal: React Native no apila Modal de forma fiable y en
+   * iOS el segundo directamente no aparece.
+   */
+  nested?: boolean
   error?: string
 }
 
@@ -36,6 +42,7 @@ export function Select<T extends string>({
   onChange,
   placeholder = 'Elegí…',
   footerAction,
+  nested,
   error,
 }: Props<T>) {
   const styles = useThemeStyles(makeStyles)
@@ -49,6 +56,49 @@ export function Select<T extends string>({
     onChange(next)
     setOpen(false)
   }
+
+  const list = (
+    <View>
+      {options.map((option, index) => (
+        <Pressable
+          key={option.value}
+          onPress={() => choose(option.value)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: option.value === value }}
+          style={({ pressed }) => [
+            styles.option,
+            index > 0 && styles.optionDivider,
+            pressed && styles.optionPressed,
+          ]}
+        >
+          <View style={styles.optionText}>
+            <Txt variant="bodyMedium" numberOfLines={1}>
+              {option.label}
+            </Txt>
+            {option.meta ? (
+              <Txt variant="caption" tone="faint" numberOfLines={1} style={styles.optionMeta}>
+                {option.meta}
+              </Txt>
+            ) : null}
+          </View>
+          {option.value === value ? <Feather name="check" size={18} color={c.brand} /> : null}
+        </Pressable>
+      ))}
+
+      {footerAction ? (
+        <View style={styles.footer}>
+          <LinkButton
+            label={footerAction.label}
+            onPress={() => {
+              // El alta inline se abre en el formulario padre, no acá adentro.
+              setOpen(false)
+              footerAction.onPress()
+            }}
+          />
+        </View>
+      ) : null}
+    </View>
+  )
 
   return (
     <View style={styles.container}>
@@ -76,7 +126,11 @@ export function Select<T extends string>({
         >
           {shown}
         </Txt>
-        <Feather name="chevron-down" size={18} color={c.faint} />
+        <Feather
+          name={nested && open ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={c.faint}
+        />
       </Pressable>
 
       {error ? (
@@ -85,48 +139,23 @@ export function Select<T extends string>({
         </Txt>
       ) : null}
 
-      <Sheet visible={open} title={label} onClose={() => setOpen(false)} scroll>
-        <View>
-          {options.map((option, index) => (
-            <Pressable
-              key={option.value}
-              onPress={() => choose(option.value)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: option.value === value }}
-              style={({ pressed }) => [
-                styles.option,
-                index > 0 && styles.optionDivider,
-                pressed && styles.optionPressed,
-              ]}
-            >
-              <View style={styles.optionText}>
-                <Txt variant="bodyMedium" numberOfLines={1}>
-                  {option.label}
-                </Txt>
-                {option.meta ? (
-                  <Txt variant="caption" tone="faint" numberOfLines={1} style={styles.optionMeta}>
-                    {option.meta}
-                  </Txt>
-                ) : null}
-              </View>
-              {option.value === value ? <Feather name="check" size={18} color={c.brand} /> : null}
-            </Pressable>
-          ))}
-
-          {footerAction ? (
-            <View style={styles.footer}>
-              <LinkButton
-                label={footerAction.label}
-                onPress={() => {
-                  // El alta inline se abre en el formulario padre, no acá adentro.
-                  setOpen(false)
-                  footerAction.onPress()
-                }}
-              />
-            </View>
-          ) : null}
-        </View>
-      </Sheet>
+      {nested ? (
+        open ? (
+          <ScrollView
+            style={styles.inlineList}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            // Sin esto, en Android el scroll del Sheet padre se come el gesto.
+            nestedScrollEnabled
+          >
+            {list}
+          </ScrollView>
+        ) : null
+      ) : (
+        <Sheet visible={open} title={label} onClose={() => setOpen(false)} scroll>
+          {list}
+        </Sheet>
+      )}
     </View>
   )
 }
@@ -151,6 +180,17 @@ const makeStyles = (c: Colors) =>
     triggerPressed: { backgroundColor: c.surfaceRaised },
     triggerError: { borderColor: c.danger },
     triggerLabel: { flex: 1 },
+
+    // La lista desplegada dentro de un Sheet: caja hundida, no flotante.
+    inlineList: {
+      backgroundColor: c.surfaceSunken,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      // Un desplegable dentro de un sheet tampoco puede crecer sin límite.
+      maxHeight: 240,
+    },
 
     // Filas de 52px, sin borde por fila: la caja ya la pone el Sheet.
     option: {
