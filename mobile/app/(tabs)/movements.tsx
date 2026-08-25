@@ -3,7 +3,7 @@ import type { Category, Movement, Wallet } from '@/src/api/types'
 import { useAuth } from '@/src/auth/AuthContext'
 import { signForType, toneForType } from '@/src/lib/format'
 import { spacing, useThemeColors, useThemeStyles, type Colors } from '@/src/theme'
-import { Chip, EmptyState, LedgerCell, LinkButton, ListRow, Screen, ThemedRefreshControl, Txt } from '@/src/ui'
+import { EmptyState, LedgerCell, ListRow, Screen, Select, ThemedRefreshControl, Txt } from '@/src/ui'
 import { screenPadding } from '@/src/ui/Screen'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -18,6 +18,9 @@ const typeLabel: Record<Movement['type'], string> = {
   collection: 'Cobro',
 }
 
+/** `null` no puede ser el value de una opción: este centinela representa "todas". */
+const TODAS = '__all__'
+
 /** `review` no es un tipo: filtra lo que entró por una integración y espera confirmación. */
 type TypeFilter = 'all' | 'review' | Movement['type']
 
@@ -29,28 +32,12 @@ const typeOptions: { id: TypeFilter; label: string }[] = [
   { id: 'transfer', label: 'Transferencias' },
 ]
 
-/** Fila de filtros: rótulo fijo y chips que se desplazan en horizontal. */
-function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
-  const styles = useThemeStyles(makeStyles)
-  return (
-    <View style={styles.filterRow}>
-      <Txt variant="label" tone="faint" style={styles.filterLabel}>
-        {label}
-      </Txt>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {children}
-      </ScrollView>
-    </View>
-  )
-}
-
 export default function MovementsScreen() {
   const styles = useThemeStyles(makeStyles)
   const c = useThemeColors()
   const { accessToken } = useAuth()
   const router = useRouter()
   const params = useLocalSearchParams<{ review?: string }>()
-  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(params.review ? 'review' : 'all')
   const [walletFilter, setWalletFilter] = useState<string | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
@@ -96,51 +83,32 @@ export default function MovementsScreen() {
       </View>
 
       <View style={styles.filters}>
-        <FilterRow label="Tipo">
-          {typeOptions.map((opt) => (
-            <Chip
-              key={opt.id}
-              label={opt.label}
-              selected={typeFilter === opt.id}
-              onPress={() => setTypeFilter(opt.id)}
-            />
-          ))}
-        </FilterRow>
+        <Select
+          label="Tipo"
+          value={typeFilter}
+          options={typeOptions.map((opt) => ({ value: opt.id, label: opt.label }))}
+          onChange={setTypeFilter}
+        />
 
-        <View style={styles.moreRow}>
-          <LinkButton
-            label={showMoreFilters ? 'Menos filtros' : `Billetera y categoría${extraFilterCount > 0 ? ` (${extraFilterCount})` : ''}`}
-            onPress={() => setShowMoreFilters((v) => !v)}
-          />
-        </View>
+        <Select
+          label="Billetera"
+          value={walletFilter ?? TODAS}
+          options={[
+            { value: TODAS, label: 'Todas' },
+            ...(wallets.data ?? []).map((w) => ({ value: w.id, label: w.name, meta: w.currency })),
+          ]}
+          onChange={(next) => setWalletFilter(next === TODAS ? null : next)}
+        />
 
-        {showMoreFilters ? (
-          <>
-            <FilterRow label="Billetera">
-              <Chip label="Todas" selected={walletFilter === null} onPress={() => setWalletFilter(null)} />
-              {(wallets.data ?? []).map((w) => (
-                <Chip
-                  key={w.id}
-                  label={w.name}
-                  selected={walletFilter === w.id}
-                  onPress={() => setWalletFilter(w.id)}
-                />
-              ))}
-            </FilterRow>
-
-            <FilterRow label="Categoría">
-              <Chip label="Todas" selected={categoryFilter === null} onPress={() => setCategoryFilter(null)} />
-              {(categories.data ?? []).map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.name}
-                  selected={categoryFilter === c.id}
-                  onPress={() => setCategoryFilter(c.id)}
-                />
-              ))}
-            </FilterRow>
-          </>
-        ) : null}
+        <Select
+          label="Categoría"
+          value={categoryFilter ?? TODAS}
+          options={[
+            { value: TODAS, label: 'Todas' },
+            ...(categories.data ?? []).map((cat) => ({ value: cat.id, label: cat.name })),
+          ]}
+          onChange={(next) => setCategoryFilter(next === TODAS ? null : next)}
+        />
       </View>
 
       {movements.isLoading ? (
@@ -171,7 +139,6 @@ export default function MovementsScreen() {
                   setTypeFilter('all')
                   setWalletFilter(null)
                   setCategoryFilter(null)
-                  setShowMoreFilters(false)
                 }}
               />
             ) : (
@@ -228,14 +195,13 @@ const makeStyles = (c: Colors) =>
     header: { paddingHorizontal: screenPadding, gap: 2, marginBottom: spacing.lg },
     filters: {
       gap: spacing.md,
+      // El padding lateral lo ponía cada FilterRow; ahora que los selects son
+      // hijos directos, va acá.
+      paddingHorizontal: screenPadding,
       paddingBottom: spacing.lg,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: c.border,
     },
-    filterRow: { gap: spacing.sm },
-    moreRow: { paddingHorizontal: screenPadding },
-    filterLabel: { paddingHorizontal: screenPadding },
-    chips: { gap: spacing.sm, paddingHorizontal: screenPadding },
     loader: { marginTop: spacing.xxxl },
     list: {
       gap: spacing.sm,
